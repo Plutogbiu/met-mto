@@ -1,22 +1,54 @@
+# 服务端基础配置
 server:
   port: 8080
 
 spring:
   application:
+    # 应用名称，后续日志、监控或服务识别会用到
     name: mto-server
   datasource:
-    url: jdbc:mysql://localhost:3306/mto?useUnicode=true&characterEncoding=utf8mb4&connectionCollation=utf8mb4_0900_ai_ci&serverTimezone=Asia/Shanghai
+    url: jdbc:mysql://localhost:3306/mto?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+  servlet:
+    multipart:
+      # 单个文件最大 20MB，当前主要用于现场照片和报告附件
+      max-file-size: 20MB
+      # 单次请求最大 100MB，便于后续一次上传多张图片时扩展
+      max-request-size: 100MB
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    timeout: 3000ms
 
+# MyBatis-Plus 基础配置
 mybatis-plus:
+  # 实体类包路径，便于 MyBatis-Plus 扫描实体别名
+  type-aliases-package: com.met.mto.entity
+  global-config:
+    db-config:
+      # 主键策略：数据库自增
+      id-type: auto
+      # 表名不额外增加全局前缀，保持代码实体和数据库表直接对应
+      table-prefix: ""
   configuration:
     map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
 
+# 项目业务配置
 mto:
   storage:
+    # 本地文件存储目录，后续上服务器时可切换为服务器目录或 MinIO
     local-path: D:/workspace/met-mto/uploads
   map:
     tencent:
-      key: ""
+      # 腾讯地图 Key，用于客户选址、后续导航和打卡定位
+      key: "7YGBZ-2EAKN-7AKFD-SLRNN-4H7EH-L3FVO"
+      referer: "MET-MTO"
+  auth:
+    # 登录 Token 过期时间，单位：分钟
+    token-expire-minutes: 30
+    # JWT 本地开发密钥，生产环境需要替换为更安全的随机密钥
+    jwt-secret: met-mto-local-development-secret-key-please-change-before-prod

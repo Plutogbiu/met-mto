@@ -1,5 +1,36 @@
-# Vue 3 + Vite
+# mto-admin
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+PC 管理后台，基于 Vue 3 + Vite + Element Plus。
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## 当前页面
+
+1. 登录。
+2. 工单管理。
+3. 工单详情。
+4. 客户管理。
+5. 客户详情。
+6. 设备管理。
+7. 人员管理。
+
+后台附件管理不单独作为菜单出现。图片上传主要给后续移动端现场使用，后台只在工单详情中查看和审查图片资料。
+
+## 本地运行
+
+```bash
+npm install
+npm run dev
+```
+
+默认访问：
+
+```text
+http://localhost:5173
+```
+
+## 构建
+
+```bash
+npm run build
+```
+
+Vite 构建时可能出现来自依赖的 pure annotation warning 和 chunk size warning，当前不影响构建结果。

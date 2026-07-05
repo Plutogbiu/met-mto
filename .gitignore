@@ -45,6 +45,8 @@ target/
 
 
 # Maven / Gradle
+.m2/
+maven-repo/
 .mvn/timing.properties
 .gradle/
 build/
@@ -52,6 +54,7 @@ build/
 # Runtime files
 tmp/
 temp/
+tools/
 uploads/
 minio-data/
 
@@ -65,4 +68,3 @@ minio-data/
 *.key
 *.p12
 *.jks
-
