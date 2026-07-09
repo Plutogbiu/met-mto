@@ -52,3 +52,4 @@ mto:
     token-expire-minutes: 30
     # JWT 本地开发密钥，生产环境需要替换为更安全的随机密钥
     jwt-secret: met-mto-local-development-secret-key-please-change-before-prod
+

@@ -60,7 +60,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Duration expires = Duration.ofMinutes(tokenExpireMinutes);
-        String token = jwtTokenUtil.createToken(user.getId(), user.getUsername(), user.getRole(), clientType, expires);
+        String token = jwtTokenUtil.createToken(user.getId(), user.getUsername(), user.getRealName(), user.getRole(), clientType, expires);
         redisTemplate.opsForValue().set(tokenKey(token), String.valueOf(user.getId()), expires.getSeconds(), TimeUnit.SECONDS);
 
         LoginResponse response = new LoginResponse();

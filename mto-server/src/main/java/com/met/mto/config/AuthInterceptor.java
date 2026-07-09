@@ -2,6 +2,8 @@ package com.met.mto.config;
 
 import com.met.mto.exception.BusinessException;
 import com.met.mto.exception.ErrorCode;
+import com.met.mto.entity.SysUser;
+import com.met.mto.mapper.SysUserMapper;
 import com.met.mto.security.PermissionService;
 import com.met.mto.security.RequirePermission;
 import com.met.mto.util.JwtTokenUtil;
@@ -26,6 +28,7 @@ public class AuthInterceptor implements HandlerInterceptor {
     private final JwtTokenUtil jwtTokenUtil;
     private final StringRedisTemplate redisTemplate;
     private final PermissionService permissionService;
+    private final SysUserMapper sysUserMapper;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
@@ -40,8 +43,15 @@ public class AuthInterceptor implements HandlerInterceptor {
 
         try {
             Claims claims = jwtTokenUtil.parseToken(token);
-            request.setAttribute("currentUserId", Long.valueOf(claims.getSubject()));
-            request.setAttribute("currentUsername", claims.get("username", String.class));
+            Long currentUserId = Long.valueOf(claims.getSubject());
+            String username = claims.get("username", String.class);
+            String realName = claims.get("realName", String.class);
+            if (!StringUtils.hasText(realName)) {
+                realName = findRealName(currentUserId, username);
+            }
+            request.setAttribute("currentUserId", currentUserId);
+            request.setAttribute("currentUsername", username);
+            request.setAttribute("currentRealName", realName);
             request.setAttribute("currentRole", claims.get("role", String.class));
             request.setAttribute("currentClientType", claims.get("clientType", String.class));
         } catch (JwtException | IllegalArgumentException exception) {
@@ -81,5 +91,16 @@ public class AuthInterceptor implements HandlerInterceptor {
             return authorization.substring(BEARER_PREFIX.length());
         }
         return request.getHeader("X-Token");
+    }
+
+    private String findRealName(Long userId, String username) {
+        if (userId == null) {
+            return username;
+        }
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user != null && StringUtils.hasText(user.getRealName())) {
+            return user.getRealName();
+        }
+        return username;
     }
 }

@@ -103,6 +103,7 @@ public class WorkOrderRecordServiceImpl implements WorkOrderRecordService {
         response.setOperatorName(record.getOperatorName());
         response.setCreatedAt(record.getCreatedAt());
         response.setAttachments(attachments);
+        
         return response;
     }
 }

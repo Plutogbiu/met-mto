@@ -42,7 +42,7 @@ public class WorkOrderRecordController {
             @RequestParam(required = false) BigDecimal latitude,
             @RequestParam(required = false) String locationAddress,
             @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
-            @RequestAttribute(value = "currentUsername", required = false) String operatorName,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
             @RequestAttribute(value = "currentRole", required = false) String currentRole
     ) {
         return ApiResult.ok(workOrderRecordService.createProcessRecord(

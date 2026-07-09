@@ -8,6 +8,9 @@ desktop.ini
 .vscode/
 *.iml
 .mvn/
+.agents
+.codex
+.vscode
 
 # Logs
 *.log
@@ -50,6 +53,7 @@ maven-repo/
 .mvn/timing.properties
 .gradle/
 build/
+
 
 # Runtime files
 tmp/
