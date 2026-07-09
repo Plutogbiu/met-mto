@@ -58,4 +58,7 @@ set r.operator_name = u.real_name
 where u.real_name is not null
   and u.real_name <> ''
   and (r.operator_name is null or r.operator_name <> u.real_name);
-  
+
+-- V20260709__add_work_order_maintenance_content
+-- 说明：工单增加维保内容字段，现场工单和巡检工单都需要填写。
+alter table work_order add column maintenance_content varchar(500) null comment '维保内容';

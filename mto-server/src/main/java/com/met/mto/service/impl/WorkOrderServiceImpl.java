@@ -221,6 +221,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         order.setDeviceId(device == null ? null : device.getId());
         order.setDeviceName(device == null ? null : device.getName());
         order.setPriority(StringUtils.hasText(request.getPriority()) ? request.getPriority() : "normal");
+        order.setMaintenanceContent(request.getMaintenanceContent());
         order.setContent(request.getContent());
         order.setNotice(request.getNotice());
         order.setEstimatedArrivalTime(request.getEstimatedArrivalTime());
@@ -409,6 +410,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         response.setDeviceName(order.getDeviceName());
         response.setPriority(order.getPriority());
         response.setStatus(order.getStatus());
+        response.setMaintenanceContent(order.getMaintenanceContent());
         response.setContent(order.getContent());
         response.setNotice(order.getNotice());
         response.setEstimatedArrivalTime(order.getEstimatedArrivalTime());

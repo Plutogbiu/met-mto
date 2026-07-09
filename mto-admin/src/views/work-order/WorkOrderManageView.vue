@@ -30,6 +30,13 @@ const priorityOptions = [
   { label: '紧急', value: 'urgent', tag: 'danger' },
 ]
 
+const maintenanceContentOptions = [
+  { label: '保内免费', value: 'warranty_free' },
+  { label: '保外收费', value: 'out_warranty_paid' },
+  { label: '保外免费', value: 'out_warranty_free' },
+  { label: '保内收费', value: 'warranty_paid' },
+]
+
 const statusOptions = [
   { label: '待处理', value: 'pending', tag: 'info' },
   { label: '处理中', value: 'processing', tag: 'warning' },
@@ -52,6 +59,7 @@ const form = reactive({
   deviceId: null,
   priority: 'normal',
   status: 'pending',
+  maintenanceContent: '',
   content: '',
   notice: '',
   estimatedArrivalTime: '',
@@ -78,6 +86,7 @@ function resetForm() {
     deviceId: null,
     priority: 'normal',
     status: 'pending',
+    maintenanceContent: '',
     content: '',
     notice: '',
     estimatedArrivalTime: '',
@@ -94,6 +103,7 @@ function buildPayload() {
     deviceId: form.type === 'onsite' ? form.deviceId : null,
     priority: form.priority,
     status: editingId.value ? form.status : undefined,
+    maintenanceContent: form.maintenanceContent,
     content: form.content,
     notice: form.notice,
     estimatedArrivalTime: form.estimatedArrivalTime || null,
@@ -206,6 +216,7 @@ async function openEdit(row) {
     deviceId: row.deviceId || null,
     priority: row.priority || 'normal',
     status: row.status || 'pending',
+    maintenanceContent: row.maintenanceContent || '',
     content: row.content || '',
     notice: row.notice || '',
     estimatedArrivalTime: row.estimatedArrivalTime || '',
@@ -244,6 +255,14 @@ async function saveWorkOrder() {
   }
   if (!form.engineerIds.length) {
     ElMessage.warning('请选择至少一名现场实施工程师')
+    return
+  }
+  if (!form.content) {
+    ElMessage.warning('请填写工单内容')
+    return
+  }
+  if (!form.maintenanceContent) {
+    ElMessage.warning('请选择维保内容')
     return
   }
 
@@ -319,7 +338,7 @@ onMounted(async () => {
 
   <section class="table-panel">
     <el-table v-loading="loading" :data="workOrders" row-key="id" height="calc(100vh - 284px)">
-      <el-table-column prop="orderNo" label="工单编号" min-width="180" fixed />
+      <el-table-column prop="orderNo" label="工单编号" min-width="200" fixed />
       <el-table-column label="类型" width="110">
         <template #default="{ row }">
           <el-tag :type="optionTag(typeOptions, row.type)" effect="light">
@@ -357,6 +376,7 @@ onMounted(async () => {
           </el-tag>
         </template>
       </el-table-column>
+
       <el-table-column prop="estimatedArrivalTime" label="预计到达" min-width="170" show-overflow-tooltip />
       <el-table-column label="预估完成" min-width="170" show-overflow-tooltip>
         <template #default="{ row }">
@@ -392,7 +412,6 @@ onMounted(async () => {
       />
     </div>
   </section>
-
   <el-dialog v-model="dialogVisible" :title="dialogTitle" width="820px" destroy-on-close>
     <el-form label-position="top" class="work-order-form">
       <el-row :gutter="16">
@@ -425,7 +444,7 @@ onMounted(async () => {
         </el-col>
       </el-row>
 
-      <el-row :gutter="16">
+      <el-row :gutter="24">
         <el-col :span="8">
           <el-form-item label="优先级">
             <el-select v-model="form.priority" class="full-control">
@@ -433,6 +452,7 @@ onMounted(async () => {
             </el-select>
           </el-form-item>
         </el-col>
+
         <el-col :span="8">
           <el-form-item label="预计到达时间" required>
             <el-date-picker
@@ -444,18 +464,22 @@ onMounted(async () => {
             />
           </el-form-item>
         </el-col>
-        <el-col v-if="editingId" :span="8">
-          <el-form-item label="状态">
-            <el-select v-model="form.status" class="full-control">
-              <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
-            </el-select>
+
+         <el-col :span="8">
+          <el-form-item label="预估完成时间" required>
+            <el-date-picker
+              v-model="form.estimatedCompleteTime"
+              class="full-control"
+              type="datetime"
+              value-format="YYYY-MM-DDTHH:mm:ss"
+              placeholder="选择预估完成时间"
+            />
           </el-form-item>
         </el-col>
-        <el-col v-else :span="8">
-          <el-form-item label="状态">
-            <el-tag type="info" effect="light">待处理</el-tag>
-          </el-form-item>
-        </el-col>
+        
+       
+
+        
       </el-row>
 
       <el-row v-if="isOnsiteOrder" :gutter="16">
@@ -479,18 +503,38 @@ onMounted(async () => {
             </el-select>
           </el-form-item>
         </el-col>
-        <el-col :span="12">
-          <el-form-item label="预估完成时间" required>
-            <el-date-picker
-              v-model="form.estimatedCompleteTime"
-              class="full-control"
-              type="datetime"
-              value-format="YYYY-MM-DDTHH:mm:ss"
-              placeholder="选择预估完成时间"
-            />
+
+         <el-col v-if="editingId" :span="4" >
+          <el-form-item label="状态">
+            <el-select v-model="form.status" class="full-control">
+              <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
           </el-form-item>
         </el-col>
+
+        <el-col v-else :span="4">
+          <el-form-item label="状态">
+            <el-tag type="info" effect="light">待处理</el-tag>
+          </el-form-item>
+        </el-col>
+
       </el-row>
+
+      <el-form-item label="维保内容" required>
+        <el-select
+          v-model="form.maintenanceContent"
+          class="full-control"
+          clearable
+          placeholder="请选择"
+        >
+          <el-option
+            v-for="item in maintenanceContentOptions"
+            :key="item.value"
+            :label="item.label"
+            :value="item.value"
+          />
+        </el-select>
+      </el-form-item>
 
       <el-form-item label="指派工程师" required>
         <el-select
@@ -511,8 +555,8 @@ onMounted(async () => {
         </el-select>
       </el-form-item>
 
-      <el-form-item label="工单内容">
-        <el-input v-model="form.content" type="textarea" :rows="4" placeholder="描述问题、维保内容或巡检要求" />
+      <el-form-item label="工单内容" required>
+        <el-input v-model="form.content" type="textarea" :rows="4" placeholder="描述问题、现场要求或巡检要求" />
       </el-form-item>
 
       <el-form-item label="注意事项">
