@@ -17,7 +17,11 @@ public interface WorkOrderService {
 
     void updateStatus(Long id, String status, Long operatorId, String operatorName);
 
+    void voidOrder(Long id, String reason, Long operatorId, String operatorName);
+
     void complete(Long id, Long operatorId, String operatorName);
+
+    void delete(Long id);
 
     void checkAccess(Long id, Long currentUserId, String currentRole);
 }

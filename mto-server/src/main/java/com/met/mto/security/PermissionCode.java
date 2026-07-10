@@ -29,6 +29,7 @@ public final class PermissionCode {
     public static final String WORK_ORDER_STATUS = "work-order:status";
     public static final String WORK_ORDER_COMPLETE = "work-order:complete";
     public static final String WORK_ORDER_PROCESS = "work-order:process";
+    public static final String WORK_ORDER_DELETE = "work-order:delete";
 
     public static final String ATTACHMENT_LIST = "attachment:list";
     public static final String ATTACHMENT_DETAIL = "attachment:detail";

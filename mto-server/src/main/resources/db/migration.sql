@@ -62,3 +62,16 @@ where u.real_name is not null
 -- V20260709__add_work_order_maintenance_content
 -- 说明：工单增加维保内容字段，现场工单和巡检工单都需要填写。
 alter table work_order add column maintenance_content varchar(500) null comment '维保内容';
+
+-- V20260709__add_work_order_delete_permission
+-- 说明：新增工单物理删除权限，仅默认分配给管理员。
+insert into sys_permission (code, name, module, status, sort_order, created_at, updated_at)
+select 'work-order:delete', '删除工单', '工单管理', 1, 380, now(), now()
+where not exists (select 1 from sys_permission where code = 'work-order:delete');
+
+insert into sys_role_permission (role, permission_code, created_at)
+select 'admin', 'work-order:delete', now()
+where not exists (
+    select 1 from sys_role_permission
+    where role = 'admin' and permission_code = 'work-order:delete'
+);

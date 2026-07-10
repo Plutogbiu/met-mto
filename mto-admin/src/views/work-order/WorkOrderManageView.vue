@@ -6,7 +6,14 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { getCustomerSitePage } from '../../api/customerSite'
 import { getDevicePage } from '../../api/device'
 import { getUserPage } from '../../api/user'
-import { createWorkOrder, getWorkOrderPage, updateWorkOrder, updateWorkOrderStatus } from '../../api/workOrder'
+import {
+  createWorkOrder,
+  deleteWorkOrder,
+  getWorkOrderPage,
+  updateWorkOrder,
+  updateWorkOrderStatus,
+  voidWorkOrder,
+} from '../../api/workOrder'
 
 const loading = ref(false)
 const router = useRouter()
@@ -19,6 +26,7 @@ const customerOptions = ref([])
 const deviceOptions = ref([])
 const engineerOptions = ref([])
 const total = ref(0)
+const currentUser = ref(readCurrentUser())
 
 const typeOptions = [
   { label: '现场工单', value: 'onsite', tag: 'primary' },
@@ -41,8 +49,10 @@ const statusOptions = [
   { label: '待处理', value: 'pending', tag: 'info' },
   { label: '处理中', value: 'processing', tag: 'warning' },
   { label: '已完成', value: 'completed', tag: 'success' },
-  { label: '已关闭', value: 'closed', tag: 'info' },
+  { label: '已作废', value: 'closed', tag: 'info' },
 ]
+
+const editableStatusOptions = statusOptions.filter((item) => item.value !== 'closed')
 
 const filters = reactive({
   keyword: '',
@@ -69,6 +79,22 @@ const form = reactive({
 
 const dialogTitle = computed(() => (editingId.value ? '编辑工单' : '新增工单'))
 const isOnsiteOrder = computed(() => form.type === 'onsite')
+
+function readCurrentUser() {
+  const value = localStorage.getItem('mto-admin-user')
+  if (!value) {
+    return null
+  }
+  try {
+    return JSON.parse(value)
+  } catch (error) {
+    return null
+  }
+}
+
+function hasPermission(permission) {
+  return currentUser.value?.permissions?.includes(permission)
+}
 
 function optionLabel(options, value) {
   return options.find((item) => item.value === value)?.label || value || '-'
@@ -287,6 +313,40 @@ async function changeStatus(row, status) {
   await loadWorkOrders()
 }
 
+async function voidOrder(row) {
+  const { value } = await ElMessageBox.prompt(
+    `确认作废工单“${row.orderNo}”？作废后将保留历史记录。`,
+    '作废工单',
+    {
+      confirmButtonText: '确认作废',
+      cancelButtonText: '取消',
+      inputType: 'textarea',
+      inputPlaceholder: '请输入作废原因',
+      inputValidator: (value) => Boolean(value && value.trim()),
+      inputErrorMessage: '请填写作废原因',
+      type: 'warning',
+    },
+  )
+  await voidWorkOrder(row.id, value.trim())
+  ElMessage.success('工单已作废')
+  await loadWorkOrders()
+}
+
+async function deleteOrder(row) {
+  await ElMessageBox.confirm(
+    `确认永久删除工单“${row.orderNo}”？删除后不可恢复，相关指派、流程记录和附件记录也会同步删除。`,
+    '删除工单',
+    {
+      type: 'warning',
+      confirmButtonText: '确认删除',
+      cancelButtonText: '取消',
+    },
+  )
+  await deleteWorkOrder(row.id)
+  ElMessage.success('工单已删除')
+  await loadWorkOrders()
+}
+
 watch(
   () => form.type,
   () => handleTypeChange(),
@@ -384,7 +444,7 @@ onMounted(async () => {
         </template>
       </el-table-column>
       <el-table-column prop="createdAt" label="创建时间" min-width="170" show-overflow-tooltip />
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="290" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" @click="openDetail(row)">详情</el-button>
           <el-button link type="primary" :icon="Edit" @click="openEdit(row)">编辑</el-button>
@@ -394,8 +454,11 @@ onMounted(async () => {
           <el-button v-if="row.status !== 'completed'" link type="success" @click="changeStatus(row, 'completed')">
             完成
           </el-button>
-          <el-button v-if="row.status !== 'closed'" link type="info" @click="changeStatus(row, 'closed')">
-            关闭
+          <el-button v-if="!['completed', 'closed'].includes(row.status)" link type="danger" @click="voidOrder(row)">
+            作废
+          </el-button>
+          <el-button v-if="hasPermission('work-order:delete')" link type="danger" @click="deleteOrder(row)">
+            删除
           </el-button>
         </template>
       </el-table-column>
@@ -507,7 +570,7 @@ onMounted(async () => {
          <el-col v-if="editingId" :span="4" >
           <el-form-item label="状态">
             <el-select v-model="form.status" class="full-control">
-              <el-option v-for="item in statusOptions" :key="item.value" :label="item.label" :value="item.value" />
+              <el-option v-for="item in editableStatusOptions" :key="item.value" :label="item.label" :value="item.value" />
             </el-select>
           </el-form-item>
         </el-col>

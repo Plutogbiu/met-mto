@@ -4,6 +4,7 @@ import { ArrowLeft, Picture, Refresh } from '@element-plus/icons-vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getAttachments } from '../../api/attachment'
 import { getWorkOrder, getWorkOrderRecords } from '../../api/workOrder'
+import { el } from 'element-plus/es/locale/index.mjs'
 
 const route = useRoute()
 const router = useRouter()
@@ -26,13 +27,21 @@ const statusOptions = [
   { label: '待处理', value: 'pending', tag: 'info' },
   { label: '处理中', value: 'processing', tag: 'warning' },
   { label: '已完成', value: 'completed', tag: 'success' },
-  { label: '已关闭', value: 'closed', tag: 'info' },
+  { label: '已作废', value: 'closed', tag: 'info' },
+]
+
+const maintenanceContentOptions = [
+  { label: '保内免费', value: 'warranty_free' },
+  { label: '保外收费', value: 'out_warranty_paid' },
+  { label: '保外免费', value: 'out_warranty_free' },
+  { label: '保内收费', value: 'warranty_paid' },
 ]
 
 const recordTypeMap = {
   create: '创建工单',
   update: '更新工单',
   status: '状态变更',
+  void: '作废工单',
   process: '处理记录',
 }
 
@@ -149,6 +158,11 @@ onMounted(() => {
           <el-descriptions-item label="创建时间">{{ workOrder.createdAt || '-' }}</el-descriptions-item>
           <el-descriptions-item label="完成时间">{{ workOrder.completedAt || '-' }}</el-descriptions-item>
           <el-descriptions-item label="客户地址" :span="2">{{ workOrder.customerAddress || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="维保内容" :span="2">
+            <el-tag :type="optionTag(maintenanceContentOptions, workOrder.maintenanceContent)" effect="light">
+              {{ optionLabel(maintenanceContentOptions, workOrder.maintenanceContent) }}
+            </el-tag>
+          </el-descriptions-item>
           <el-descriptions-item label="工单内容" :span="2">{{ workOrder.content || '-' }}</el-descriptions-item>
           <el-descriptions-item label="注意事项" :span="2">{{ workOrder.notice || '-' }}</el-descriptions-item>
         </el-descriptions>
