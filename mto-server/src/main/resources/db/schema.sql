@@ -152,3 +152,21 @@ create table if not exists work_order_record (
     key idx_work_order_record_type (record_type),
     key idx_work_order_record_created_at (created_at)
 ) comment '工单处理记录';
+
+create table if not exists app_version (
+    id bigint primary key auto_increment,
+    platform varchar(20) not null default 'android' comment '平台，android 或 ios',
+    update_type varchar(20) not null default 'wgt' comment '更新类型，wgt 热更新包或 apk 安装包',
+    version_name varchar(50) not null comment '版本名称',
+    version_code int not null comment '版本号，用于客户端比较',
+    min_version_code int not null default 0 comment '最低可用版本号，低于该版本时强制更新',
+    base_version_code int null comment 'WGT 包对应的基础 APK 版本号',
+    download_url varchar(500) not null comment '更新包下载地址',
+    release_notes varchar(1000) null comment '更新说明',
+    force_update tinyint not null default 0 comment '是否强制更新：1 是，0 否',
+    status tinyint not null default 1 comment '状态：1 启用，0 停用',
+    created_at datetime not null,
+    updated_at datetime not null,
+    key idx_app_version_platform_status (platform, status),
+    key idx_app_version_version_code (version_code)
+) comment 'App 版本发布记录';
