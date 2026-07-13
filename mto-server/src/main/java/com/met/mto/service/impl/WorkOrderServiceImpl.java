@@ -184,7 +184,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     @Transactional
     public void complete(Long id, Long operatorId, String operatorName) {
-        checkCompleteCheckin(id);
+        checkCompleteRequirements(id);
         changeStatus(id, "completed", "完成工单", operatorId, operatorName);
     }
 
@@ -251,7 +251,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         saveRecord(id, "status", oldStatus, status, recordContent, operatorId, operatorName);
     }
 
-    private void checkCompleteCheckin(Long workOrderId) {
+    private void checkCompleteRequirements(Long workOrderId) {
         WorkOrder order = findById(workOrderId);
         if ("completed".equals(order.getStatus())) {
             return;
@@ -259,14 +259,50 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         if ("closed".equals(order.getStatus())) {
             throw new BusinessException(ErrorCode.BAD_REQUEST, "已作废工单不能变更状态");
         }
-        Long count = workOrderRecordMapper.selectCount(new LambdaQueryWrapper<WorkOrderRecord>()
+
+        Long attachmentCount = fileAttachmentMapper.selectCount(new LambdaQueryWrapper<FileAttachment>()
+                .eq(FileAttachment::getBizType, "work_order")
+                .eq(FileAttachment::getBizId, workOrderId)
+                .eq(FileAttachment::getStatus, 1));
+        if (attachmentCount == null || attachmentCount <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请至少上传 1 张现场附件后再完成工单");
+        }
+
+        List<WorkOrderEngineer> engineers = workOrderEngineerMapper.selectList(new LambdaQueryWrapper<WorkOrderEngineer>()
+                .eq(WorkOrderEngineer::getWorkOrderId, workOrderId)
+                .orderByAsc(WorkOrderEngineer::getId));
+        if (engineers.isEmpty()) {
+            throw new BusinessException(ErrorCode.WORK_ORDER_ENGINEER_REQUIRED);
+        }
+
+        Set<Long> checkedInUserIds = workOrderRecordMapper.selectList(new LambdaQueryWrapper<WorkOrderRecord>()
                 .eq(WorkOrderRecord::getWorkOrderId, workOrderId)
                 .eq(WorkOrderRecord::getRecordType, "process")
                 .isNotNull(WorkOrderRecord::getLongitude)
-                .isNotNull(WorkOrderRecord::getLatitude));
-        if (count == null || count <= 0) {
-            throw new BusinessException(ErrorCode.WORK_ORDER_CHECKIN_REQUIRED);
+                .isNotNull(WorkOrderRecord::getLatitude))
+                .stream()
+                .map(WorkOrderRecord::getOperatorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<String> missingNames = engineers.stream()
+                .filter(engineer -> !checkedInUserIds.contains(engineer.getUserId()))
+                .map(this::engineerDisplayName)
+                .collect(Collectors.toList());
+        if (!missingNames.isEmpty()) {
+            throw new BusinessException(ErrorCode.WORK_ORDER_CHECKIN_REQUIRED,
+                    "还有工程师未完成现场打卡：" + String.join("、", missingNames));
         }
+    }
+
+    private String engineerDisplayName(WorkOrderEngineer engineer) {
+        if (StringUtils.hasText(engineer.getRealName())) {
+            return engineer.getRealName();
+        }
+        if (StringUtils.hasText(engineer.getUsername())) {
+            return engineer.getUsername();
+        }
+        return String.valueOf(engineer.getUserId());
     }
 
     private void apply(WorkOrder order, WorkOrderRequest request, CustomerSite customerSite, CustomerDevice device) {
