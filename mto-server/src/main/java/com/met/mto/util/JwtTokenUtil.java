@@ -16,18 +16,19 @@ public class JwtTokenUtil {
     @Value("${mto.auth.jwt-secret}")
     private String jwtSecret;
 
-    public String createToken(Long userId, String username, String role, String clientType, Duration expires) {
+    public String createToken(Long userId, String username, String realName, String role, String clientType, Duration expires) {
         Date now = new Date();
         Date expiration = new Date(now.getTime() + expires.toMillis());
-        return Jwts.builder()
+        io.jsonwebtoken.JwtBuilder builder = Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
+                .claim("realName", realName)
                 .claim("role", role)
                 .claim("clientType", clientType)
                 .issuedAt(now)
                 .expiration(expiration)
-                .signWith(secretKey())
-                .compact();
+                .signWith(secretKey());
+        return builder.compact();
     }
 
     public Claims parseToken(String token) {

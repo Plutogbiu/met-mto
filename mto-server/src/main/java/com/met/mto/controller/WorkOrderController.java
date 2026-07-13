@@ -11,6 +11,7 @@ import com.met.mto.service.WorkOrderService;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -96,7 +97,7 @@ public class WorkOrderController {
     public ApiResult<WorkOrderResponse> create(
             @RequestBody WorkOrderRequest request,
             @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
-            @RequestAttribute(value = "currentUsername", required = false) String operatorName
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName
     ) {
         return ApiResult.ok(workOrderService.create(request, operatorId, operatorName));
     }
@@ -107,7 +108,7 @@ public class WorkOrderController {
             @PathVariable Long id,
             @RequestBody WorkOrderRequest request,
             @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
-            @RequestAttribute(value = "currentUsername", required = false) String operatorName,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
             @RequestAttribute(value = "currentRole", required = false) String currentRole
     ) {
         workOrderService.checkAccess(id, operatorId, currentRole);
@@ -120,11 +121,25 @@ public class WorkOrderController {
             @PathVariable Long id,
             @RequestParam String status,
             @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
-            @RequestAttribute(value = "currentUsername", required = false) String operatorName,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
             @RequestAttribute(value = "currentRole", required = false) String currentRole
     ) {
         workOrderService.checkAccess(id, operatorId, currentRole);
         workOrderService.updateStatus(id, status, operatorId, operatorName);
+        return ApiResult.ok();
+    }
+
+    @PutMapping("/{id}/void")
+    @RequirePermission(PermissionCode.WORK_ORDER_STATUS)
+    public ApiResult<Void> voidOrder(
+            @PathVariable Long id,
+            @RequestParam String reason,
+            @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        workOrderService.checkAccess(id, operatorId, currentRole);
+        workOrderService.voidOrder(id, reason, operatorId, operatorName);
         return ApiResult.ok();
     }
 
@@ -133,11 +148,18 @@ public class WorkOrderController {
     public ApiResult<Void> complete(
             @PathVariable Long id,
             @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
-            @RequestAttribute(value = "currentUsername", required = false) String operatorName,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
             @RequestAttribute(value = "currentRole", required = false) String currentRole
     ) {
         workOrderService.checkAccess(id, operatorId, currentRole);
         workOrderService.complete(id, operatorId, operatorName);
+        return ApiResult.ok();
+    }
+
+    @DeleteMapping("/{id}")
+    @RequirePermission(PermissionCode.WORK_ORDER_DELETE)
+    public ApiResult<Void> delete(@PathVariable Long id) {
+        workOrderService.delete(id);
         return ApiResult.ok();
     }
 }

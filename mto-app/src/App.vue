@@ -1,7 +1,10 @@
 <script>
+import { checkAppUpdate } from './utils/update'
+
 export default {
   onLaunch() {
-    console.log('MTO app launch')
+    console.log('MTO 应用启动')
+    checkAppUpdate()
   },
 }
 </script>

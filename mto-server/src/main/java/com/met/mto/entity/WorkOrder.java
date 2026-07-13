@@ -33,6 +33,8 @@ public class WorkOrder {
 
     private String status;
 
+    private String maintenanceContent;
+
     private String content;
 
     private String notice;

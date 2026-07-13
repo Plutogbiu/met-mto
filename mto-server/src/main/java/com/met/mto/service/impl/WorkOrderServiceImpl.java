@@ -9,6 +9,7 @@ import com.met.mto.dto.WorkOrderRequest;
 import com.met.mto.dto.WorkOrderResponse;
 import com.met.mto.entity.CustomerDevice;
 import com.met.mto.entity.CustomerSite;
+import com.met.mto.entity.FileAttachment;
 import com.met.mto.entity.SysUser;
 import com.met.mto.entity.WorkOrder;
 import com.met.mto.entity.WorkOrderEngineer;
@@ -17,6 +18,7 @@ import com.met.mto.exception.BusinessException;
 import com.met.mto.exception.ErrorCode;
 import com.met.mto.mapper.CustomerDeviceMapper;
 import com.met.mto.mapper.CustomerSiteMapper;
+import com.met.mto.mapper.FileAttachmentMapper;
 import com.met.mto.mapper.SysUserMapper;
 import com.met.mto.mapper.WorkOrderEngineerMapper;
 import com.met.mto.mapper.WorkOrderMapper;
@@ -56,6 +58,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private final CustomerDeviceMapper customerDeviceMapper;
     private final CustomerSiteMapper customerSiteMapper;
     private final SysUserMapper sysUserMapper;
+    private final FileAttachmentMapper fileAttachmentMapper;
 
     @Override
     public PageResult<WorkOrderResponse> page(WorkOrderQuery query) {
@@ -133,6 +136,9 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         apply(order, request, customerSite, device);
         if (StringUtils.hasText(request.getStatus())) {
             checkStatus(request.getStatus());
+            if ("closed".equals(request.getStatus()) && !"closed".equals(order.getStatus())) {
+                throw new BusinessException(ErrorCode.BAD_REQUEST, "请通过作废功能处理工单");
+            }
             order.setStatus(request.getStatus());
             if ("completed".equals(request.getStatus()) && order.getCompletedAt() == null) {
                 order.setCompletedAt(LocalDateTime.now());
@@ -149,14 +155,69 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Transactional
     public void updateStatus(Long id, String status, Long operatorId, String operatorName) {
         checkStatus(status);
+        if ("closed".equals(status)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请通过作废功能处理工单");
+        }
         changeStatus(id, status, "状态变更", operatorId, operatorName);
     }
 
     @Override
     @Transactional
+    public void voidOrder(Long id, String reason, Long operatorId, String operatorName) {
+        if (!StringUtils.hasText(reason)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写作废原因");
+        }
+        WorkOrder order = findById(id);
+        if ("closed".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "工单已作废");
+        }
+        if ("completed".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "已完成工单不能作废");
+        }
+        String oldStatus = order.getStatus();
+        order.setStatus("closed");
+        order.setUpdatedAt(LocalDateTime.now());
+        workOrderMapper.updateById(order);
+        saveRecord(id, "void", oldStatus, "closed", reason.trim(), operatorId, operatorName);
+    }
+
+    @Override
+    @Transactional
     public void complete(Long id, Long operatorId, String operatorName) {
-        checkCompleteCheckin(id);
+        checkCompleteRequirements(id);
         changeStatus(id, "completed", "完成工单", operatorId, operatorName);
+    }
+
+    @Override
+    @Transactional
+    public void delete(Long id) {
+        WorkOrder order = findById(id);
+        if ("completed".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "已完成工单不能删除");
+        }
+
+        List<Long> recordIds = workOrderRecordMapper.selectList(new LambdaQueryWrapper<WorkOrderRecord>()
+                        .eq(WorkOrderRecord::getWorkOrderId, id))
+                .stream()
+                .map(WorkOrderRecord::getId)
+                .collect(Collectors.toList());
+
+        workOrderEngineerMapper.delete(new LambdaQueryWrapper<WorkOrderEngineer>()
+                .eq(WorkOrderEngineer::getWorkOrderId, id));
+
+        fileAttachmentMapper.delete(new LambdaQueryWrapper<FileAttachment>()
+                .eq(FileAttachment::getBizType, "work_order")
+                .eq(FileAttachment::getBizId, id));
+
+        if (!recordIds.isEmpty()) {
+            fileAttachmentMapper.delete(new LambdaQueryWrapper<FileAttachment>()
+                    .eq(FileAttachment::getBizType, "work_order_record")
+                    .in(FileAttachment::getBizId, recordIds));
+        }
+
+        workOrderRecordMapper.delete(new LambdaQueryWrapper<WorkOrderRecord>()
+                .eq(WorkOrderRecord::getWorkOrderId, id));
+        workOrderMapper.deleteById(id);
     }
 
     @Override
@@ -178,7 +239,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     private void changeStatus(Long id, String status, String recordContent, Long operatorId, String operatorName) {
         WorkOrder order = findById(id);
         if ("closed".equals(order.getStatus()) && !"closed".equals(status)) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "已关闭工单不能变更状态");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "已作废工单不能变更状态");
         }
         String oldStatus = order.getStatus();
         order.setStatus(status);
@@ -190,22 +251,58 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         saveRecord(id, "status", oldStatus, status, recordContent, operatorId, operatorName);
     }
 
-    private void checkCompleteCheckin(Long workOrderId) {
+    private void checkCompleteRequirements(Long workOrderId) {
         WorkOrder order = findById(workOrderId);
         if ("completed".equals(order.getStatus())) {
             return;
         }
         if ("closed".equals(order.getStatus())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "已关闭工单不能变更状态");
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "已作废工单不能变更状态");
         }
-        Long count = workOrderRecordMapper.selectCount(new LambdaQueryWrapper<WorkOrderRecord>()
+
+        Long attachmentCount = fileAttachmentMapper.selectCount(new LambdaQueryWrapper<FileAttachment>()
+                .eq(FileAttachment::getBizType, "work_order")
+                .eq(FileAttachment::getBizId, workOrderId)
+                .eq(FileAttachment::getStatus, 1));
+        if (attachmentCount == null || attachmentCount <= 0) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请至少上传 1 张现场附件后再完成工单");
+        }
+
+        List<WorkOrderEngineer> engineers = workOrderEngineerMapper.selectList(new LambdaQueryWrapper<WorkOrderEngineer>()
+                .eq(WorkOrderEngineer::getWorkOrderId, workOrderId)
+                .orderByAsc(WorkOrderEngineer::getId));
+        if (engineers.isEmpty()) {
+            throw new BusinessException(ErrorCode.WORK_ORDER_ENGINEER_REQUIRED);
+        }
+
+        Set<Long> checkedInUserIds = workOrderRecordMapper.selectList(new LambdaQueryWrapper<WorkOrderRecord>()
                 .eq(WorkOrderRecord::getWorkOrderId, workOrderId)
                 .eq(WorkOrderRecord::getRecordType, "process")
                 .isNotNull(WorkOrderRecord::getLongitude)
-                .isNotNull(WorkOrderRecord::getLatitude));
-        if (count == null || count <= 0) {
-            throw new BusinessException(ErrorCode.WORK_ORDER_CHECKIN_REQUIRED);
+                .isNotNull(WorkOrderRecord::getLatitude))
+                .stream()
+                .map(WorkOrderRecord::getOperatorId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        List<String> missingNames = engineers.stream()
+                .filter(engineer -> !checkedInUserIds.contains(engineer.getUserId()))
+                .map(this::engineerDisplayName)
+                .collect(Collectors.toList());
+        if (!missingNames.isEmpty()) {
+            throw new BusinessException(ErrorCode.WORK_ORDER_CHECKIN_REQUIRED,
+                    "还有工程师未完成现场打卡：" + String.join("、", missingNames));
         }
+    }
+
+    private String engineerDisplayName(WorkOrderEngineer engineer) {
+        if (StringUtils.hasText(engineer.getRealName())) {
+            return engineer.getRealName();
+        }
+        if (StringUtils.hasText(engineer.getUsername())) {
+            return engineer.getUsername();
+        }
+        return String.valueOf(engineer.getUserId());
     }
 
     private void apply(WorkOrder order, WorkOrderRequest request, CustomerSite customerSite, CustomerDevice device) {
@@ -221,6 +318,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         order.setDeviceId(device == null ? null : device.getId());
         order.setDeviceName(device == null ? null : device.getName());
         order.setPriority(StringUtils.hasText(request.getPriority()) ? request.getPriority() : "normal");
+        order.setMaintenanceContent(request.getMaintenanceContent());
         order.setContent(request.getContent());
         order.setNotice(request.getNotice());
         order.setEstimatedArrivalTime(request.getEstimatedArrivalTime());
@@ -409,6 +507,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         response.setDeviceName(order.getDeviceName());
         response.setPriority(order.getPriority());
         response.setStatus(order.getStatus());
+        response.setMaintenanceContent(order.getMaintenanceContent());
         response.setContent(order.getContent());
         response.setNotice(order.getNotice());
         response.setEstimatedArrivalTime(order.getEstimatedArrivalTime());

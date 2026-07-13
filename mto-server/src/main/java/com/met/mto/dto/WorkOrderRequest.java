@@ -17,6 +17,8 @@ public class WorkOrderRequest {
 
     private String status;
 
+    private String maintenanceContent;
+
     private String content;
 
     private String notice;

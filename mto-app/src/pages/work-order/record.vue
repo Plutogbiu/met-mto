@@ -93,6 +93,7 @@ export default {
         create: '创建记录',
         update: '更新记录',
         status: '状态变更',
+        void: '作废工单',
         process: '处理记录',
       }
       return map[value] || value || '-'
@@ -102,7 +103,7 @@ export default {
         pending: '待处理',
         processing: '处理中',
         completed: '已完成',
-        closed: '已关闭',
+        closed: '已作废',
       }
       return map[status] || status || '-'
     },

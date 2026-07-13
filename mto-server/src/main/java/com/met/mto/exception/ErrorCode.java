@@ -32,6 +32,7 @@ public enum ErrorCode {
     FILE_EMPTY(1602, "上传文件不能为空"),
     FILE_UPLOAD_FAILED(1603, "文件上传失败");
 
+    
     private final int code;
     private final String message;
 

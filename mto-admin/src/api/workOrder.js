@@ -22,6 +22,16 @@ export function updateWorkOrderStatus(id, status) {
   })
 }
 
+export function voidWorkOrder(id, reason) {
+  return http.put(`/admin/work-orders/${id}/void`, null, {
+    params: { reason },
+  })
+}
+
+export function deleteWorkOrder(id) {
+  return http.delete(`/admin/work-orders/${id}`)
+}
+
 export function getWorkOrderRecords(id) {
   return http.get(`/admin/work-orders/${id}/records`)
 }
