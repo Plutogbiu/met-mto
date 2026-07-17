@@ -1,5 +1,6 @@
 import {
   AUTH_EXPIRE_KEY,
+  AUTH_REMEMBER_KEY,
   AUTH_TOKEN_KEY,
   AUTH_USER_KEY,
 } from '../config'
@@ -47,6 +48,41 @@ export function clearAuth() {
   uni.removeStorageSync(AUTH_TOKEN_KEY)
   uni.removeStorageSync(AUTH_USER_KEY)
   uni.removeStorageSync(AUTH_EXPIRE_KEY)
+}
+
+export function getRememberedCredentials() {
+  const value = uni.getStorageSync(AUTH_REMEMBER_KEY)
+  const credentials = typeof value === 'string' ? parseRememberedCredentials(value) : value
+  if (!credentials?.username || !credentials?.password) {
+    clearRememberedCredentials()
+    return null
+  }
+  return {
+    username: credentials.username,
+    password: credentials.password,
+  }
+}
+
+export function saveRememberedCredentials(credentials) {
+  if (!credentials?.username || !credentials?.password) {
+    return
+  }
+  uni.setStorageSync(AUTH_REMEMBER_KEY, {
+    username: credentials.username,
+    password: credentials.password,
+  })
+}
+
+export function clearRememberedCredentials() {
+  uni.removeStorageSync(AUTH_REMEMBER_KEY)
+}
+
+function parseRememberedCredentials(value) {
+  try {
+    return JSON.parse(value)
+  } catch (error) {
+    return null
+  }
 }
 
 export function isLoggedIn() {

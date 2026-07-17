@@ -43,3 +43,4 @@ export function getFileBaseUrl() {
 export const AUTH_TOKEN_KEY = 'mto_auth_token'
 export const AUTH_USER_KEY = 'mto_auth_user'
 export const AUTH_EXPIRE_KEY = 'mto_auth_expires_at'
+export const AUTH_REMEMBER_KEY = 'mto_auth_remember_credentials'
