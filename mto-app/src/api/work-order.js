@@ -29,6 +29,14 @@ export function completeWorkOrder(id) {
   })
 }
 
+export function updateWorkOrderContent(id, content) {
+  return request({
+    url: `/admin/work-orders/${id}/content`,
+    method: 'PUT',
+    data: { content },
+  })
+}
+
 export function fetchWorkOrderRecords(workOrderId) {
   return request({
     url: `/admin/work-orders/${workOrderId}/records`,

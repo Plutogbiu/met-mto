@@ -2,6 +2,7 @@ package com.met.mto.controller;
 
 import com.met.mto.common.ApiResult;
 import com.met.mto.common.PageResult;
+import com.met.mto.dto.WorkOrderContentRequest;
 import com.met.mto.dto.WorkOrderQuery;
 import com.met.mto.dto.WorkOrderRequest;
 import com.met.mto.dto.WorkOrderResponse;
@@ -113,6 +114,20 @@ public class WorkOrderController {
     ) {
         workOrderService.checkAccess(id, operatorId, currentRole);
         return ApiResult.ok(workOrderService.update(id, request, operatorId, operatorName));
+    }
+
+    @PutMapping("/{id}/content")
+    @RequirePermission(PermissionCode.WORK_ORDER_PROCESS)
+    public ApiResult<Void> updateContent(
+            @PathVariable Long id,
+            @RequestBody WorkOrderContentRequest request,
+            @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        workOrderService.checkAccess(id, operatorId, currentRole);
+        workOrderService.updateContent(id, request == null ? null : request.getContent(), operatorId, operatorName);
+        return ApiResult.ok();
     }
 
     @PutMapping("/{id}/status")

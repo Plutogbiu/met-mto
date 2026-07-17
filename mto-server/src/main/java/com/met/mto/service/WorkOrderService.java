@@ -15,6 +15,8 @@ public interface WorkOrderService {
 
     WorkOrderResponse update(Long id, WorkOrderRequest request, Long operatorId, String operatorName);
 
+    void updateContent(Long id, String content, Long operatorId, String operatorName);
+
     void updateStatus(Long id, String status, Long operatorId, String operatorName);
 
     void voidOrder(Long id, String reason, Long operatorId, String operatorName);

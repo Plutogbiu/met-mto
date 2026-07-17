@@ -21,8 +21,6 @@ public class WorkOrderRequest {
 
     private String content;
 
-    private String notice;
-
     private LocalDateTime estimatedArrivalTime;
 
     private LocalDateTime estimatedCompleteTime;

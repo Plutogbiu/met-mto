@@ -95,3 +95,7 @@ create table if not exists app_version (
     key idx_app_version_platform_status (platform, status),
     key idx_app_version_version_code (version_code)
 ) comment 'App 版本发布记录';
+
+-- V20260717__remove_work_order_notice
+-- 说明：工单不再使用注意事项字段，历史库升级时删除对应列。
+alter table work_order drop column notice;

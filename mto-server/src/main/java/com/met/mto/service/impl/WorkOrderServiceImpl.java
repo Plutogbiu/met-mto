@@ -153,6 +153,22 @@ public class WorkOrderServiceImpl implements WorkOrderService {
 
     @Override
     @Transactional
+    public void updateContent(Long id, String content, Long operatorId, String operatorName) {
+        if (!StringUtils.hasText(content)) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "请填写工单内容");
+        }
+        WorkOrder order = findById(id);
+        if ("completed".equals(order.getStatus()) || "closed".equals(order.getStatus())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "已完成或已作废工单不能编辑工单内容");
+        }
+        order.setContent(content.trim());
+        order.setUpdatedAt(LocalDateTime.now());
+        workOrderMapper.updateById(order);
+        saveRecord(id, "process", null, null, "更新工单内容：" + content.trim(), operatorId, operatorName);
+    }
+
+    @Override
+    @Transactional
     public void updateStatus(Long id, String status, Long operatorId, String operatorName) {
         checkStatus(status);
         if ("closed".equals(status)) {
@@ -320,7 +336,6 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         order.setPriority(StringUtils.hasText(request.getPriority()) ? request.getPriority() : "normal");
         order.setMaintenanceContent(request.getMaintenanceContent());
         order.setContent(request.getContent());
-        order.setNotice(request.getNotice());
         order.setEstimatedArrivalTime(request.getEstimatedArrivalTime());
         order.setEstimatedCompleteTime("onsite".equals(request.getType()) ? request.getEstimatedCompleteTime() : null);
     }
@@ -509,7 +524,6 @@ public class WorkOrderServiceImpl implements WorkOrderService {
         response.setStatus(order.getStatus());
         response.setMaintenanceContent(order.getMaintenanceContent());
         response.setContent(order.getContent());
-        response.setNotice(order.getNotice());
         response.setEstimatedArrivalTime(order.getEstimatedArrivalTime());
         response.setEstimatedCompleteTime(order.getEstimatedCompleteTime());
         response.setCompletedAt(order.getCompletedAt());

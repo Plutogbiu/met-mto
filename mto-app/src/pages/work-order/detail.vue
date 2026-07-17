@@ -76,6 +76,10 @@
           </text>
         </view>
         <view class="info-row">
+          <text class="info-label">维保内容</text>
+          <text class="info-value">{{ maintenanceContentText(detail.maintenanceContent) }}</text>
+        </view>
+        <view class="info-row">
           <text class="info-label">预计到达</text>
           <text class="info-value">{{ formatTime(detail.estimatedArrivalTime) }}</text>
         </view>
@@ -97,12 +101,40 @@
     <view class="panel" v-if="detail">
       <view class="panel-title">处理说明</view>
       <view class="content-block">
-        <view class="block-label">维保内容</view>
+        <view class="block-label-row">
+          <view class="block-label">工单内容</view>
+          <view v-if="!isFinished" class="edit-content" @click="openContentEditor">
+            <u-icon name="edit-pen" color="#165DFF" size="15" />
+            <text>编辑</text>
+          </view>
+        </view>
         <view class="block-text">{{ detail.content || '暂无' }}</view>
       </view>
-      <view class="content-block">
-        <view class="block-label">注意事项</view>
-        <view class="block-text">{{ detail.notice || '暂无' }}</view>
+    </view>
+
+    <view v-if="contentEditorVisible" class="editor-mask" @click.self="closeContentEditor">
+      <view class="editor-sheet">
+        <view class="editor-head">
+          <view class="editor-title">编辑工单内容</view>
+          <view class="editor-close" @click="closeContentEditor">
+            <u-icon name="close" color="#64748B" size="18" />
+          </view>
+        </view>
+        <u-textarea
+          v-model="editingContent"
+          placeholder="请输入工单内容"
+          maxlength="500"
+          autoHeight
+          border="none"
+          :customStyle="contentEditorStyle"
+        />
+        <view class="editor-actions">
+          <view class="editor-cancel" @click="closeContentEditor">取消</view>
+          <view class="editor-submit" :class="{ disabled: savingContent }" @click="saveContent">
+            <u-loading-icon v-if="savingContent" color="#fff" size="17" />
+            <text>{{ savingContent ? '保存中' : '保存' }}</text>
+          </view>
+        </view>
       </view>
     </view>
 
@@ -158,6 +190,7 @@ import {
   fetchAttachments,
   fetchWorkOrderDetail,
   fetchWorkOrderRecords,
+  updateWorkOrderContent,
 } from '../../api/work-order'
 import { fileUrl } from '../../utils/request'
 
@@ -170,6 +203,13 @@ const ATTACHMENT_LABELS = {
   inspection_receipt: '巡检回执',
 }
 
+const MAINTENANCE_CONTENT_LABELS = {
+  warranty_free: '保内免费',
+  out_warranty_paid: '保外收费',
+  out_warranty_free: '保外免费',
+  warranty_paid: '保内收费',
+}
+
 export default {
   data() {
     return {
@@ -180,6 +220,15 @@ export default {
       loadingAttachments: false,
       completing: false,
       completeMessage: '',
+      contentEditorVisible: false,
+      savingContent: false,
+      editingContent: '',
+      contentEditorStyle: {
+        minHeight: '220rpx',
+        padding: '18rpx',
+        borderRadius: '16rpx',
+        background: '#F6F8FB',
+      },
     }
   },
   computed: {
@@ -256,6 +305,31 @@ export default {
     goUpload() {
       uni.navigateTo({ url: `/pages/work-order/upload?id=${this.id}&type=${this.detail?.type || ''}` })
     },
+    openContentEditor() {
+      this.editingContent = this.detail?.content || ''
+      this.contentEditorVisible = true
+    },
+    closeContentEditor() {
+      if (this.savingContent) return
+      this.contentEditorVisible = false
+    },
+    async saveContent() {
+      const content = this.editingContent.trim()
+      if (!content) {
+        uni.showToast({ title: '请填写工单内容', icon: 'none' })
+        return
+      }
+      if (this.savingContent) return
+      this.savingContent = true
+      try {
+        await updateWorkOrderContent(this.id, content)
+        this.contentEditorVisible = false
+        uni.showToast({ title: '已保存', icon: 'success' })
+        await this.loadDetail()
+      } finally {
+        this.savingContent = false
+      }
+    },
     async completeWorkOrder() {
       if (this.completing) return
       if (!this.hasCheckinRecord) {
@@ -301,6 +375,9 @@ export default {
     priorityText(priority) {
       const map = { urgent: '紧急', normal: '普通' }
       return map[priority] || priority || '-'
+    },
+    maintenanceContentText(value) {
+      return MAINTENANCE_CONTENT_LABELS[value] || value || '暂无'
     },
     statusText(status) {
       const map = {
@@ -601,11 +678,27 @@ export default {
   margin-top: 22rpx;
 }
 
+.block-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+}
+
 .block-label {
   margin-bottom: 10rpx;
   color: #344054;
   font-size: 25rpx;
   font-weight: 800;
+}
+
+.edit-content {
+  display: flex;
+  align-items: center;
+  gap: 5rpx;
+  color: #165dff;
+  font-size: 23rpx;
+  font-weight: 700;
 }
 
 .block-text {
@@ -616,6 +709,82 @@ export default {
   color: #6b7280;
   font-size: 25rpx;
   line-height: 1.7;
+}
+
+.editor-mask {
+  position: fixed;
+  z-index: 1000;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 23, 42, 0.34);
+}
+
+.editor-sheet {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 30rpx 24rpx calc(30rpx + env(safe-area-inset-bottom));
+  border-radius: 28rpx 28rpx 0 0;
+  background: #fff;
+}
+
+.editor-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 22rpx;
+}
+
+.editor-title {
+  color: #172033;
+  font-size: 31rpx;
+  font-weight: 800;
+}
+
+.editor-close {
+  display: grid;
+  width: 56rpx;
+  height: 56rpx;
+  place-items: center;
+  border-radius: 16rpx;
+  background: #f6f8fb;
+}
+
+.editor-actions {
+  display: flex;
+  gap: 16rpx;
+  margin-top: 26rpx;
+}
+
+.editor-cancel,
+.editor-submit {
+  display: flex;
+  height: 82rpx;
+  align-items: center;
+  justify-content: center;
+  border-radius: 16rpx;
+  font-size: 27rpx;
+  font-weight: 700;
+}
+
+.editor-cancel {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  color: #64748b;
+}
+
+.editor-submit {
+  flex: 1.5;
+  gap: 10rpx;
+  background: #165dff;
+  color: #fff;
+}
+
+.editor-submit.disabled {
+  opacity: 0.72;
 }
 
 .loading-box,

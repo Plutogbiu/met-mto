@@ -71,7 +71,6 @@ const form = reactive({
   status: 'pending',
   maintenanceContent: '',
   content: '',
-  notice: '',
   estimatedArrivalTime: '',
   estimatedCompleteTime: '',
   engineerIds: [],
@@ -114,7 +113,6 @@ function resetForm() {
     status: 'pending',
     maintenanceContent: '',
     content: '',
-    notice: '',
     estimatedArrivalTime: '',
     estimatedCompleteTime: '',
     engineerIds: [],
@@ -131,7 +129,6 @@ function buildPayload() {
     status: editingId.value ? form.status : undefined,
     maintenanceContent: form.maintenanceContent,
     content: form.content,
-    notice: form.notice,
     estimatedArrivalTime: form.estimatedArrivalTime || null,
     estimatedCompleteTime: form.type === 'onsite' ? form.estimatedCompleteTime || null : null,
     engineerIds: form.engineerIds,
@@ -244,7 +241,6 @@ async function openEdit(row) {
     status: row.status || 'pending',
     maintenanceContent: row.maintenanceContent || '',
     content: row.content || '',
-    notice: row.notice || '',
     estimatedArrivalTime: row.estimatedArrivalTime || '',
     estimatedCompleteTime: row.estimatedCompleteTime || '',
     engineerIds: (row.engineers || []).map((item) => item.userId),
@@ -622,9 +618,6 @@ onMounted(async () => {
         <el-input v-model="form.content" type="textarea" :rows="4" placeholder="描述问题、现场要求或巡检要求" />
       </el-form-item>
 
-      <el-form-item label="注意事项">
-        <el-input v-model="form.notice" type="textarea" :rows="3" placeholder="现场安全、联系、设备等注意事项" />
-      </el-form-item>
     </el-form>
 
     <template #footer>

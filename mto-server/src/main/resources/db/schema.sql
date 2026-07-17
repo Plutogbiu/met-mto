@@ -90,7 +90,6 @@ create table if not exists work_order (
     status varchar(30) not null default 'pending' comment '状态：pending待处理，processing处理中，completed已完成，closed已关闭',
     content varchar(1000) null comment '工单内容',
     maintenance_content varchar(500) null comment '维保内容',
-    notice varchar(1000) null comment '注意事项',
     estimated_arrival_time datetime null comment '预计到达时间',
     estimated_complete_time datetime null comment '预估完成时间',
     completed_at datetime null comment '完成时间',

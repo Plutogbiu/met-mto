@@ -164,7 +164,6 @@ onMounted(() => {
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="工单内容" :span="2">{{ workOrder.content || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="注意事项" :span="2">{{ workOrder.notice || '-' }}</el-descriptions-item>
         </el-descriptions>
       </section>
 
