@@ -1,6 +1,7 @@
 package com.met.mto.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.met.mto.dto.ChangePasswordRequest;
 import com.met.mto.dto.LoginRequest;
 import com.met.mto.dto.LoginResponse;
 import com.met.mto.entity.SysUser;
@@ -75,6 +76,33 @@ public class AuthServiceImpl implements AuthService {
         response.setRole(user.getRole());
         response.setPermissions(permissionService.listEffectivePermissions(user.getId(), user.getRole()).stream().sorted().collect(Collectors.toList()));
         return response;
+    }
+
+    @Override
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        if (request == null
+                || !StringUtils.hasText(request.getOldPassword())
+                || !StringUtils.hasText(request.getNewPassword())) {
+            throw new BusinessException(ErrorCode.USER_PASSWORD_REQUIRED);
+        }
+        if (request.getOldPassword().equals(request.getNewPassword())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "新密码不能与旧密码相同");
+        }
+
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        if (!PasswordUtil.sha256(request.getOldPassword()).equalsIgnoreCase(user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.USER_OLD_PASSWORD_INCORRECT);
+        }
+
+        user.setPasswordHash(PasswordUtil.sha256(request.getNewPassword()));
+        user.setUpdatedAt(java.time.LocalDateTime.now());
+        sysUserMapper.updateById(user);
     }
 
     @Override

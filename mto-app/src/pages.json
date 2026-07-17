@@ -62,6 +62,13 @@
       }
     },
     {
+      "path": "pages/settings/password",
+      "style": {
+        "navigationBarTitleText": "修改密码",
+        "navigationStyle": "custom"
+      }
+    },
+    {
       "path": "pages/settings/developer",
       "style": {
         "navigationBarTitleText": "开发者设置",

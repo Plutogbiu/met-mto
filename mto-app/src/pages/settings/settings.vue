@@ -77,7 +77,7 @@ export default {
         return
       }
       if (key === 'password') {
-        uni.showToast({ title: '修改密码功能待接入', icon: 'none' })
+        uni.navigateTo({ url: '/pages/settings/password' })
       }
     },
   },
