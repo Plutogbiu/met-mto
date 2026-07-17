@@ -44,6 +44,11 @@
         <text>{{ loading ? '登录中' : '登录' }}</text>
       </view>
     </view>
+
+    <view class="developer-entry" @click="openDeveloperSettings">
+      <u-icon name="setting" color="#98A2B3" size="15" />
+      <text>开发者设置</text>
+    </view>
   </view>
 </template>
 
@@ -84,6 +89,9 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    openDeveloperSettings() {
+      uni.navigateTo({ url: '/pages/settings/developer' })
     },
   },
 }
@@ -191,5 +199,15 @@ export default {
 
 .login-button.loading {
   opacity: 0.82;
+}
+
+.developer-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8rpx;
+  margin-top: 34rpx;
+  color: #98a2b3;
+  font-size: 23rpx;
 }
 </style>

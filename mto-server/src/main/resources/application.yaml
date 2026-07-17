@@ -41,6 +41,9 @@ mto:
       key: "7YGBZ-2EAKN-7AKFD-SLRNN-4H7EH-L3FVO"
       referer: "MET-MTO"
   auth:
-    token-expire-minutes: 30
+    # 后台管理端会话有效期，降低管理端长期登录风险
+    admin-token-expire-minutes: 30
+    # 现场 App 会话有效期，减少现场工程师重复登录
+    app-token-expire-days: 7
     jwt-secret: met-mto-local-development-secret-key-please-change-before-prod
 

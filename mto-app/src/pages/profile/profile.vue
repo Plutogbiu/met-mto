@@ -90,7 +90,7 @@ export default {
         return
       }
       if (action === 'settings') {
-        this.showDeveloping()
+        uni.navigateTo({ url: '/pages/settings/settings' })
         return
       }
       if (action === 'logout') {
@@ -105,9 +105,6 @@ export default {
       }
       clearAuth()
       uni.reLaunch({ url: '/pages/login/login' })
-    },
-    showDeveloping() {
-      uni.showToast({ title: '功能规划中', icon: 'none' })
     },
   },
 }

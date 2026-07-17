@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../config'
+import { getApiBaseUrl, getFileBaseUrl } from '../config'
 import { clearAuth, getToken } from './auth'
 
 function handleApiResult(resolve, reject, response) {
@@ -27,7 +27,7 @@ export function request(options = {}) {
   return new Promise((resolve, reject) => {
     const token = getToken()
     uni.request({
-      url: `${API_BASE_URL}${options.url || ''}`,
+      url: `${getApiBaseUrl()}${options.url || ''}`,
       method: options.method || 'GET',
       data: options.data,
       header: {
@@ -49,7 +49,7 @@ export function uploadFile({ url, filePath, name = 'file', formData = {} }) {
   return new Promise((resolve, reject) => {
     const token = getToken()
     uni.uploadFile({
-      url: `${API_BASE_URL}${url}`,
+      url: `${getApiBaseUrl()}${url}`,
       filePath,
       name,
       formData,
@@ -82,5 +82,5 @@ export function fileUrl(path) {
   if (/^https?:\/\//.test(path)) {
     return path
   }
-  return `${API_BASE_URL.replace(/\/api$/, '')}${path}`
+  return `${getFileBaseUrl()}${path}`
 }

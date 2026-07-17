@@ -34,8 +34,11 @@ public class AuthServiceImpl implements AuthService {
     private final StringRedisTemplate redisTemplate;
     private final PermissionService permissionService;
 
-    @Value("${mto.auth.token-expire-minutes}")
-    private long tokenExpireMinutes;
+    @Value("${mto.auth.admin-token-expire-minutes}")
+    private long adminTokenExpireMinutes;
+
+    @Value("${mto.auth.app-token-expire-days}")
+    private long appTokenExpireDays;
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -59,7 +62,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "现场实施人员只能登录 App");
         }
 
-        Duration expires = Duration.ofMinutes(tokenExpireMinutes);
+        Duration expires = resolveTokenExpires(clientType);
         String token = jwtTokenUtil.createToken(user.getId(), user.getUsername(), user.getRealName(), user.getRole(), clientType, expires);
         redisTemplate.opsForValue().set(tokenKey(token), String.valueOf(user.getId()), expires.getSeconds(), TimeUnit.SECONDS);
 
@@ -83,6 +86,13 @@ public class AuthServiceImpl implements AuthService {
 
     private String tokenKey(String token) {
         return TOKEN_PREFIX + token;
+    }
+
+    private Duration resolveTokenExpires(String clientType) {
+        if (CLIENT_APP.equals(clientType)) {
+            return Duration.ofDays(appTokenExpireDays);
+        }
+        return Duration.ofMinutes(adminTokenExpireMinutes);
     }
 
     private String resolveClientType(String clientType) {
