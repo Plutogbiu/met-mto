@@ -85,6 +85,8 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .in(!filteredOrderIds.isEmpty(), WorkOrder::getId, filteredOrderIds)
                 .ge(query.getCreatedStart() != null, WorkOrder::getCreatedAt, query.getCreatedStart())
                 .le(query.getCreatedEnd() != null, WorkOrder::getCreatedAt, query.getCreatedEnd())
+                .ge(query.getCompletedStart() != null, WorkOrder::getCompletedAt, query.getCompletedStart())
+                .le(query.getCompletedEnd() != null, WorkOrder::getCompletedAt, query.getCompletedEnd())
                 .orderByDesc(WorkOrder::getUpdatedAt)
                 .orderByDesc(WorkOrder::getId);
 
@@ -207,10 +209,7 @@ public class WorkOrderServiceImpl implements WorkOrderService {
     @Override
     @Transactional
     public void delete(Long id) {
-        WorkOrder order = findById(id);
-        if ("completed".equals(order.getStatus())) {
-            throw new BusinessException(ErrorCode.BAD_REQUEST, "已完成工单不能删除");
-        }
+        findById(id);
 
         List<Long> recordIds = workOrderRecordMapper.selectList(new LambdaQueryWrapper<WorkOrderRecord>()
                         .eq(WorkOrderRecord::getWorkOrderId, id))

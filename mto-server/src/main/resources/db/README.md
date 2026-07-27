@@ -39,6 +39,7 @@ source data.sql;
 `migration.sql` 追加格式建议：
 
 ```sql
+-- v1.xxxx版本
 -- V20260708__add_xxx_field
 -- 说明：这里写清楚本次升级目的。
 alter table xxx add column xxx varchar(50) null comment 'xxx';
@@ -46,3 +47,6 @@ alter table xxx add column xxx varchar(50) null comment 'xxx';
 
 服务器升级时，只执行本次新增的版本段，避免重复执行旧补丁。
 
+## 批量导出文件
+
+工单批量导出任务的 ZIP 文件不使用 `/uploads` 静态目录，而是保存到 `mto.export.local-path` 配置的私有目录。文件仅允许通过带权限的下载接口访问，默认保留 24 小时后由定时任务清理。

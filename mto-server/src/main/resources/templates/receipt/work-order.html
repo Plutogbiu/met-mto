@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8" />
+    <style>
+        @page { size: A4; margin: 10mm 12mm 14mm 12mm; }
+        * { box-sizing: border-box; }
+        body { font-family: MtoSans, sans-serif; color: #526070; font-size: 11px; line-height: 1.55; }
+        .report-header { min-height: 46px; padding: 0 0 9px; border-bottom: 1px solid #e5e9ef; }
+        .brand-logo { width: 42px; height: 42px; vertical-align: middle; }
+        .brand-name { display: inline-block; margin-left: 10px; color: #273445; font-size: 20px; font-weight: bold; vertical-align: middle; }
+        .report-title { margin-top: 5px; color: #8a96a3; font-size: 10px; }
+        .section { margin-top: 13px; padding: 10px 12px 12px; border: 1px solid #e4e8ed; page-break-inside: avoid; }
+        .section-title { margin: 0 0 7px; color: #596878; font-size: 14px; font-weight: bold; }
+        .field { margin: 2px 0; word-wrap: break-word; }
+        .field-label { display: inline-block; min-width: 76px; color: #667585; }
+        .field-value { color: #394858; }
+        .content { min-height: 52px; margin-top: 3px; padding: 6px 8px; color: #394858; white-space: pre-wrap; border: 1px solid #edf0f3; background: #fbfcfd; }
+        .engineer { display: inline-block; margin-right: 10px; }
+        .image-grid { display: block; margin-top: 8px; }
+        .image-item { display: inline-block; width: 48%; margin: 0 2% 12px 0; vertical-align: top; page-break-inside: avoid; }
+        .image-item:nth-child(2n) { margin-right: 0; }
+        .image-item img { display: block; width: 100%; max-height: 210px; border: 1px solid #e1e6eb; }
+        .image-name { margin-top: 4px; color: #7b8794; font-size: 10px; text-align: center; word-wrap: break-word; }
+        .empty { padding: 16px; color: #9aa5b1; text-align: center; border: 1px dashed #dce2e8; }
+        .footer { margin-top: 13px; color: #9aa5b1; text-align: right; font-size: 10px; }
+    </style>
+</head>
+<body>
+    <div class="report-header">
+        <img class="brand-logo" th:if="${report.companyLogoDataUri}" th:src="${report.companyLogoDataUri}" alt="物链易通" />
+        <span class="brand-name">物链易通运维服务回执单</span>
+        <div class="report-title">现场服务记录 · 工单回执报告</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">客户信息</div>
+        <div class="field"><span class="field-label">客户名称：</span><span class="field-value" th:text="${report.customerName}">-</span></div>
+        <div class="field"><span class="field-label">客户地址：</span><span class="field-value" th:text="${report.customerAddress}">-</span></div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">工单信息</div>
+        <div class="field"><span class="field-label">工单编号：</span><span class="field-value" th:text="${report.orderNo}">-</span></div>
+        <div class="field"><span class="field-label">工单类型：</span><span class="field-value" th:text="${report.type}">-</span></div>
+        <div class="field"><span class="field-label">设备信息：</span><span class="field-value" th:text="${report.deviceName}">-</span></div>
+        <div class="field"><span class="field-label">维保类型：</span><span class="field-value" th:text="${report.maintenanceContent}">-</span></div>
+        <div class="field"><span class="field-label">工单创建人：</span><span class="field-value" th:text="${report.creatorName}">-</span></div>
+        <div class="field"><span class="field-label">指派工程师：</span><span class="field-value"><span class="engineer" th:each="engineer : ${report.engineers}" th:text="${engineer}">-</span></span></div>
+        <div class="field"><span class="field-label">创建时间：</span><span class="field-value" th:text="${report.createdAt}">-</span></div>
+        <div class="field"><span class="field-label">完成时间：</span><span class="field-value" th:text="${report.completedAt}">-</span></div>
+        <div class="field"><span class="field-label">工单内容：</span></div>
+        <div class="content" th:text="${report.content}">-</div>
+    </div>
+
+    <div class="section">
+        <div class="section-title">回执信息</div>
+        <div class="field"><span class="field-label" th:text="${report.imageSectionTitle} + '：'">现场图片和回执图片：</span></div>
+        <div class="image-grid" th:if="${not #lists.isEmpty(report.images)}">
+            <div class="image-item" th:each="image : ${report.images}">
+                <img th:src="${image.dataUri}" alt="现场附件" />
+                <div class="image-name"><span th:text="${image.categoryLabel}">附件</span> · <span th:text="${image.originalName}">图片</span></div>
+            </div>
+        </div>
+        <div class="empty" th:if="${#lists.isEmpty(report.images)}" th:text="${'暂无' + report.imageSectionTitle}">暂无现场图片和回执图片</div>
+    </div>
+
+    <div class="footer">报告生成时间：<span th:text="${report.generatedAt}">-</span></div>
+</body>
+</html>

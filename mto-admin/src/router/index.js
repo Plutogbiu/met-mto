@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
+import DashboardView from '../views/dashboard/DashboardView.vue'
 import LoginView from '../views/login/LoginView.vue'
 import CustomerDetailView from '../views/customer/CustomerDetailView.vue'
 import CustomerManageView from '../views/customer/CustomerManageView.vue'
@@ -17,8 +18,14 @@ const routes = [
   {
     path: '/',
     component: AdminLayout,
-    redirect: '/work-orders',
+    redirect: '/dashboard',
     children: [
+      {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: DashboardView,
+        meta: { title: '数据看板', permission: 'dashboard:view' },
+      },
       {
         path: 'work-orders',
         name: 'workOrders',
@@ -106,6 +113,9 @@ function hasPermission(user, permission) {
 }
 
 function firstAllowedPath(user) {
+  if (hasPermission(user, 'dashboard:view')) {
+    return '/dashboard'
+  }
   if (hasPermission(user, 'work-order:list')) {
     return '/work-orders'
   }

@@ -114,6 +114,44 @@ create table if not exists work_order_engineer (
     key idx_work_order_engineer_user (user_id)
 ) comment '工单指派工程师';
 
+create table if not exists work_order_export_task (
+    id bigint primary key auto_increment,
+    task_no varchar(40) not null comment '导出任务编号',
+    creator_id bigint null comment '创建人ID',
+    creator_name varchar(50) null comment '创建人姓名快照',
+    status varchar(20) not null comment '状态：pending排队中，processing处理中，success成功，failed失败，expired已过期',
+    total_count int not null default 0 comment '工单总数',
+    success_count int not null default 0 comment '成功数量',
+    failed_count int not null default 0 comment '失败数量',
+    file_name varchar(255) null comment 'ZIP 文件名',
+    storage_path varchar(500) null comment '私有导出文件相对路径',
+    file_size bigint null comment 'ZIP 文件大小',
+    error_message varchar(500) null comment '任务失败原因',
+    started_at datetime null comment '开始时间',
+    completed_at datetime null comment '完成时间',
+    expire_at datetime null comment '文件过期时间',
+    created_at datetime not null,
+    updated_at datetime not null,
+    unique key uk_work_order_export_task_no (task_no),
+    key idx_work_order_export_task_creator (creator_id),
+    key idx_work_order_export_task_status (status),
+    key idx_work_order_export_task_expire (expire_at)
+) comment '工单批量导出任务';
+
+create table if not exists work_order_export_item (
+    id bigint primary key auto_increment,
+    task_id bigint not null comment '导出任务ID',
+    work_order_id bigint not null comment '工单ID',
+    order_no varchar(40) null comment '工单编号快照',
+    status varchar(20) not null comment '状态：pending排队中，success成功，failed失败',
+    error_message varchar(500) null comment '该工单导出失败原因',
+    created_at datetime not null,
+    updated_at datetime not null,
+    unique key uk_work_order_export_item_task_order (task_id, work_order_id),
+    key idx_work_order_export_item_task (task_id),
+    key idx_work_order_export_item_status (status)
+) comment '工单批量导出明细';
+
 create table if not exists file_attachment (
     id bigint primary key auto_increment,
     biz_type varchar(50) null comment '业务类型，例如 work_order',

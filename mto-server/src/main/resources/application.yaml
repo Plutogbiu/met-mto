@@ -35,6 +35,15 @@ mybatis-plus:
 mto:
   storage:
     local-path: D:/workspace/met-mto/uploads
+  pdf:
+    # PDF 中文字体，路径相对于后端启动目录；字体文件放在与 Jar 同级的 fonts 目录
+    font-path: D:/workspace/met-mto/mto-server/fonts/NotoSansSC.ttf
+  export:
+    # 批量回执 ZIP 为私有文件，仅能通过鉴权接口下载
+    local-path: ./exports
+    max-work-orders: 200
+    queue-capacity: 2
+    expire-hours: 24
   map:
     tencent:
       # 腾讯地图 Key，用于客户选址、后续导航和打卡定位

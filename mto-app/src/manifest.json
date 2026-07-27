@@ -1,9 +1,9 @@
 {
-    "name" : "MTO",
+    "name" : "MTO工单",
     "appid" : "__UNI__6B4511F",
     "description" : "运维内部工单移动端",
-    "versionName" : "1.0.1",
-    "versionCode" : "101",
+    "versionName" : "1.2",
+    "versionCode" : "102",
     "transformPx" : false,
     "app-plus" : {
         "usingComponents" : true,

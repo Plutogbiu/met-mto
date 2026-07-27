@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { Cpu, Document, OfficeBuilding, SwitchButton, User } from '@element-plus/icons-vue'
+import { Cpu, DataAnalysis, Document, OfficeBuilding, SwitchButton, User } from '@element-plus/icons-vue'
 import { logout as logoutApi } from '../api/auth'
 
 const router = useRouter()
@@ -47,6 +47,10 @@ async function logout() {
       </div>
 
       <el-menu router :default-active="activeMenu" class="menu">
+        <el-menu-item v-if="hasPermission('dashboard:view')" index="/dashboard">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>数据看板</span>
+        </el-menu-item>
         <el-menu-item v-if="hasPermission('work-order:list')" index="/work-orders">
           <el-icon><Document /></el-icon>
           <span>工单管理</span>

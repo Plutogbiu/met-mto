@@ -2,6 +2,8 @@ package com.met.mto.security;
 
 public final class PermissionCode {
 
+    public static final String DASHBOARD_VIEW = "dashboard:view";
+
     public static final String USER_LIST = "user:list";
     public static final String USER_DETAIL = "user:detail";
     public static final String USER_CREATE = "user:create";
@@ -30,6 +32,8 @@ public final class PermissionCode {
     public static final String WORK_ORDER_COMPLETE = "work-order:complete";
     public static final String WORK_ORDER_PROCESS = "work-order:process";
     public static final String WORK_ORDER_DELETE = "work-order:delete";
+    public static final String WORK_ORDER_RECEIPT_EXPORT = "work-order:receipt-export";
+    public static final String WORK_ORDER_RECEIPT_BATCH_EXPORT = "work-order:receipt-batch-export";
 
     public static final String ATTACHMENT_LIST = "attachment:list";
     public static final String ATTACHMENT_DETAIL = "attachment:detail";
