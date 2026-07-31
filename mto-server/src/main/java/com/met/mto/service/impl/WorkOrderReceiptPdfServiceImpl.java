@@ -18,6 +18,10 @@ import com.met.mto.mapper.WorkOrderMapper;
 import com.met.mto.mapper.WorkOrderRecordMapper;
 import com.met.mto.service.WorkOrderReceiptPdfService;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
+import java.awt.Color;
+import java.awt.Graphics2D;
+import java.awt.RenderingHints;
+import java.awt.image.BufferedImage;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -29,10 +33,16 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.stream.Collectors;
+import javax.imageio.IIOImage;
+import javax.imageio.ImageIO;
+import javax.imageio.ImageWriteParam;
+import javax.imageio.ImageWriter;
+import javax.imageio.stream.ImageOutputStream;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
@@ -47,6 +57,7 @@ public class WorkOrderReceiptPdfServiceImpl implements WorkOrderReceiptPdfServic
 
     private static final DateTimeFormatter DISPLAY_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final DateTimeFormatter FILE_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final String PDF_IMAGE_CONTENT_TYPE = "image/jpeg";
     private static final Map<String, String> TYPE_LABELS = new HashMap<>();
     private static final Map<String, String> CATEGORY_LABELS = new HashMap<>();
     private static final Map<String, String> MAINTENANCE_CONTENT_LABELS = new HashMap<>();
@@ -78,6 +89,12 @@ public class WorkOrderReceiptPdfServiceImpl implements WorkOrderReceiptPdfServic
 
     @Value("${mto.pdf.font-path:}")
     private String fontPath;
+
+    @Value("${mto.pdf.image-max-edge:1600}")
+    private int pdfImageMaxEdge;
+
+    @Value("${mto.pdf.image-quality:0.82}")
+    private float pdfImageQuality;
 
     @Override
     public WorkOrderReceiptFile export(Long workOrderId) {
@@ -204,7 +221,10 @@ public class WorkOrderReceiptPdfServiceImpl implements WorkOrderReceiptPdfServic
             if (!file.startsWith(root) || !Files.isRegularFile(file)) {
                 return null;
             }
-            String dataUri = "data:" + contentType + ";base64," + Base64.getEncoder().encodeToString(Files.readAllBytes(file));
+            String dataUri = createPdfImageDataUri(file);
+            if (dataUri == null) {
+                return null;
+            }
             return new WorkOrderReceiptImage(
                     attachment.getCategory(),
                     label(CATEGORY_LABELS, attachment.getCategory()),
@@ -212,6 +232,59 @@ public class WorkOrderReceiptPdfServiceImpl implements WorkOrderReceiptPdfServic
                     valueOrDash(attachment.getOriginalName()));
         } catch (IOException ignored) {
             return null;
+        }
+    }
+
+    private String createPdfImageDataUri(Path file) throws IOException {
+        BufferedImage source = ImageIO.read(file.toFile());
+        if (source == null) {
+            return null;
+        }
+        try {
+            int maxEdge = Math.max(pdfImageMaxEdge, 320);
+            int sourceWidth = source.getWidth();
+            int sourceHeight = source.getHeight();
+            double scale = Math.min(1D, maxEdge / (double) Math.max(sourceWidth, sourceHeight));
+            int targetWidth = Math.max(1, (int) Math.round(sourceWidth * scale));
+            int targetHeight = Math.max(1, (int) Math.round(sourceHeight * scale));
+
+            BufferedImage normalized = new BufferedImage(targetWidth, targetHeight, BufferedImage.TYPE_INT_RGB);
+            Graphics2D graphics = normalized.createGraphics();
+            try {
+                graphics.setColor(Color.WHITE);
+                graphics.fillRect(0, 0, targetWidth, targetHeight);
+                graphics.setRenderingHint(RenderingHints.KEY_INTERPOLATION,
+                        RenderingHints.VALUE_INTERPOLATION_BILINEAR);
+                graphics.setRenderingHint(RenderingHints.KEY_RENDERING, RenderingHints.VALUE_RENDER_QUALITY);
+                graphics.drawImage(source, 0, 0, targetWidth, targetHeight, null);
+            } finally {
+                graphics.dispose();
+            }
+
+            try (ByteArrayOutputStream output = new ByteArrayOutputStream();
+                    ImageOutputStream imageOutput = ImageIO.createImageOutputStream(output)) {
+                Iterator<ImageWriter> writers = ImageIO.getImageWritersByFormatName("jpeg");
+                if (!writers.hasNext()) {
+                    throw new IOException("未找到 JPEG 图片编码器");
+                }
+                ImageWriter writer = writers.next();
+                try {
+                    writer.setOutput(imageOutput);
+                    ImageWriteParam parameters = writer.getDefaultWriteParam();
+                    if (parameters.canWriteCompressed()) {
+                        parameters.setCompressionMode(ImageWriteParam.MODE_EXPLICIT);
+                        parameters.setCompressionQuality(Math.max(0.1F, Math.min(pdfImageQuality, 1F)));
+                    }
+                    writer.write(null, new IIOImage(normalized, null, null), parameters);
+                } finally {
+                    writer.dispose();
+                    normalized.flush();
+                }
+                return "data:" + PDF_IMAGE_CONTENT_TYPE + ";base64,"
+                        + Base64.getEncoder().encodeToString(output.toByteArray());
+            }
+        } finally {
+            source.flush();
         }
     }
 

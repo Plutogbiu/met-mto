@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.met.mto.dto.DashboardCustomerRankResponse;
 import com.met.mto.dto.DashboardOverviewResponse;
+import com.met.mto.dto.DashboardWorkOrderTrendResponse;
 import com.met.mto.entity.WorkOrder;
 import com.met.mto.mapper.WorkOrderMapper;
 import com.met.mto.service.DashboardService;
@@ -191,4 +192,5 @@ public class DashboardServiceImpl implements DashboardService {
     private long toLong(Object value) {
         return value instanceof Number ? ((Number) value).longValue() : 0L;
     }
+
 }

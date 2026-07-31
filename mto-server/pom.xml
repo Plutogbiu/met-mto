@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.met</groupId>
     <artifactId>mto-server</artifactId>
-    <version>v1.2-SNAPSHOT</version>
+    <version>v1.3-SNAPSHOT</version>
     <name>mto-server</name>
     <description>mto-server</description>
     <url/>

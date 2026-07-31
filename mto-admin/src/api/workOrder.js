@@ -39,6 +39,7 @@ export function getWorkOrderRecords(id) {
 export function downloadWorkOrderReceipt(id) {
   return http.get(`/admin/work-orders/${id}/receipt-pdf`, {
     responseType: 'blob',
+    timeout: 0,
   })
 }
 
@@ -53,6 +54,7 @@ export function getWorkOrderExportTask(id) {
 export function downloadWorkOrderExportTask(id) {
   return http.get(`/admin/work-orders/export-tasks/${id}/download`, {
     responseType: 'blob',
+    timeout: 0,
   })
 }
 

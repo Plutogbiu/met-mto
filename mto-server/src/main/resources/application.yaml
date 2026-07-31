@@ -36,8 +36,10 @@ mto:
   storage:
     local-path: D:/workspace/met-mto/uploads
   pdf:
-    # PDF 中文字体，路径相对于后端启动目录；字体文件放在与 Jar 同级的 fonts 目录
     font-path: D:/workspace/met-mto/mto-server/fonts/NotoSansSC.ttf
+    # 回执 PDF 图片单边最大像素与 JPEG 压缩质量，不影响原始附件
+    image-max-edge: 1600
+    image-quality: 0.82
   export:
     # 批量回执 ZIP 为私有文件，仅能通过鉴权接口下载
     local-path: ./exports
