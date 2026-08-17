@@ -4,6 +4,10 @@ export function getWorkOrderPage(params) {
   return http.get('/admin/work-orders', { params })
 }
 
+export function getWorkOrderStatusSummary(params) {
+  return http.get('/admin/work-orders/status-summary', { params })
+}
+
 export function getWorkOrder(id) {
   return http.get(`/admin/work-orders/${id}`)
 }
@@ -51,11 +55,8 @@ export function getWorkOrderExportTask(id) {
   return http.get(`/admin/work-orders/export-tasks/${id}`)
 }
 
-export function downloadWorkOrderExportTask(id) {
-  return http.get(`/admin/work-orders/export-tasks/${id}/download`, {
-    responseType: 'blob',
-    timeout: 0,
-  })
+export function createWorkOrderExportDownloadTicket(id) {
+  return http.post(`/admin/work-orders/export-tasks/${id}/download-ticket`)
 }
 
 export function createWorkOrderRecord(id, data) {

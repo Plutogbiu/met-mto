@@ -2,6 +2,7 @@ package com.met.mto.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.met.mto.dto.WorkOrderExportDownloadFile;
+import com.met.mto.dto.WorkOrderExportDownloadTicketResponse;
 import com.met.mto.dto.WorkOrderExportTaskRequest;
 import com.met.mto.dto.WorkOrderExportTaskResponse;
 import com.met.mto.entity.WorkOrder;
@@ -23,7 +24,9 @@ import java.nio.file.StandardOpenOption;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.Executor;
@@ -36,6 +39,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.task.TaskRejectedException;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,11 +56,22 @@ public class WorkOrderExportTaskServiceImpl implements WorkOrderExportTaskServic
     private static final int DEFAULT_MAX_WORK_ORDER_COUNT = 200;
     private static final DateTimeFormatter TASK_NO_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
     private static final DateTimeFormatter ZIP_NAME_FORMATTER = DateTimeFormatter.ofPattern("yyyyMMddHHmmss");
+    private static final String DOWNLOAD_TICKET_PREFIX = "mto:work-order-export:download-ticket:";
+    private static final SecureRandom DOWNLOAD_TICKET_RANDOM = new SecureRandom();
+    private static final DefaultRedisScript<String> CONSUME_DOWNLOAD_TICKET_SCRIPT = new DefaultRedisScript<String>(
+            "local value = redis.call('get', KEYS[1]); "
+                    + "if value and string.sub(value, 1, string.len(ARGV[1])) == ARGV[1] then "
+                    + "redis.call('del', KEYS[1]); "
+                    + "end; "
+                    + "return value;",
+            String.class
+    );
 
     private final WorkOrderMapper workOrderMapper;
     private final WorkOrderExportTaskMapper workOrderExportTaskMapper;
     private final WorkOrderExportItemMapper workOrderExportItemMapper;
     private final WorkOrderReceiptPdfService workOrderReceiptPdfService;
+    private final StringRedisTemplate redisTemplate;
 
     private final Executor workOrderExportExecutor;
 
@@ -68,17 +84,22 @@ public class WorkOrderExportTaskServiceImpl implements WorkOrderExportTaskServic
     @Value("${mto.export.expire-hours:24}")
     private long expireHours;
 
+    @Value("${mto.export.download-ticket-expire-minutes:5}")
+    private long downloadTicketExpireMinutes;
+
     public WorkOrderExportTaskServiceImpl(
             WorkOrderMapper workOrderMapper,
             WorkOrderExportTaskMapper workOrderExportTaskMapper,
             WorkOrderExportItemMapper workOrderExportItemMapper,
             WorkOrderReceiptPdfService workOrderReceiptPdfService,
+            StringRedisTemplate redisTemplate,
             @Qualifier("workOrderExportExecutor") Executor workOrderExportExecutor
     ) {
         this.workOrderMapper = workOrderMapper;
         this.workOrderExportTaskMapper = workOrderExportTaskMapper;
         this.workOrderExportItemMapper = workOrderExportItemMapper;
         this.workOrderReceiptPdfService = workOrderReceiptPdfService;
+        this.redisTemplate = redisTemplate;
         this.workOrderExportExecutor = workOrderExportExecutor;
     }
 
@@ -148,6 +169,81 @@ public class WorkOrderExportTaskServiceImpl implements WorkOrderExportTaskServic
         } catch (IOException exception) {
             throw new BusinessException(ErrorCode.SYSTEM_ERROR, "读取导出文件失败");
         }
+    }
+
+    @Override
+    public WorkOrderExportDownloadTicketResponse createDownloadTicket(Long taskId, Long currentUserId, String currentRole) {
+        WorkOrderExportTask task = findTask(taskId);
+        checkTaskAccess(task, currentUserId, currentRole);
+        getDownloadFile(taskId, currentUserId, currentRole);
+        if (currentUserId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+
+        String ticket = generateDownloadTicket();
+        long expireMinutes = Math.max(1L, downloadTicketExpireMinutes);
+        try {
+            redisTemplate.opsForValue().set(
+                    downloadTicketKey(ticket),
+                    taskId + ":" + currentUserId,
+                    expireMinutes,
+                    java.util.concurrent.TimeUnit.MINUTES
+            );
+        } catch (Exception exception) {
+            log.error("保存工单导出下载凭证失败：taskId={}", taskId, exception);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "下载凭证生成失败，请稍后重试");
+        }
+        return new WorkOrderExportDownloadTicketResponse(
+                "/api/admin/work-orders/export-tasks/" + taskId + "/download?ticket=" + ticket,
+                LocalDateTime.now().plusMinutes(expireMinutes)
+        );
+    }
+
+    @Override
+    public WorkOrderExportDownloadFile consumeDownloadTicket(Long taskId, String ticket) {
+        if (!StringUtils.hasText(ticket)) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "下载凭证不能为空");
+        }
+        String value;
+        try {
+            value = redisTemplate.execute(
+                    CONSUME_DOWNLOAD_TICKET_SCRIPT,
+                    Collections.singletonList(downloadTicketKey(ticket)),
+                    taskId + ":"
+            );
+        } catch (Exception exception) {
+            log.error("读取工单导出下载凭证失败：taskId={}", taskId, exception);
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "下载凭证校验失败，请稍后重试");
+        }
+        if (!StringUtils.hasText(value) || !value.startsWith(taskId + ":")) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED, "下载凭证无效或已过期");
+        }
+        WorkOrderExportTask task = findTask(taskId);
+        if (!"success".equals(task.getStatus()) || !StringUtils.hasText(task.getStoragePath())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "导出任务尚未完成");
+        }
+        if (task.getExpireAt() != null && !task.getExpireAt().isAfter(LocalDateTime.now())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "导出文件已过期，请重新生成");
+        }
+        Path file = resolveExportFile(task.getStoragePath());
+        if (!Files.isRegularFile(file)) {
+            throw new BusinessException(ErrorCode.NOT_FOUND, "导出文件不存在或已清理");
+        }
+        try {
+            return new WorkOrderExportDownloadFile(task.getFileName(), file, Files.size(file));
+        } catch (IOException exception) {
+            throw new BusinessException(ErrorCode.SYSTEM_ERROR, "读取导出文件失败");
+        }
+    }
+
+    private String generateDownloadTicket() {
+        byte[] bytes = new byte[32];
+        DOWNLOAD_TICKET_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    private String downloadTicketKey(String ticket) {
+        return DOWNLOAD_TICKET_PREFIX + ticket;
     }
 
     @PostConstruct

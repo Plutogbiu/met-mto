@@ -7,6 +7,7 @@ import com.met.mto.dto.WorkOrderEngineerResponse;
 import com.met.mto.dto.WorkOrderQuery;
 import com.met.mto.dto.WorkOrderRequest;
 import com.met.mto.dto.WorkOrderResponse;
+import com.met.mto.dto.WorkOrderStatusSummaryResponse;
 import com.met.mto.entity.CustomerDevice;
 import com.met.mto.entity.CustomerSite;
 import com.met.mto.entity.FileAttachment;
@@ -98,6 +99,44 @@ public class WorkOrderServiceImpl implements WorkOrderService {
                 .map(order -> toResponse(order, engineerMap.getOrDefault(order.getId(), Collections.emptyList())))
                 .collect(Collectors.toList());
         return new PageResult<>(records, page.getTotal(), page.getCurrent(), page.getSize());
+    }
+
+    @Override
+    public WorkOrderStatusSummaryResponse statusSummary(WorkOrderQuery query) {
+        WorkOrderStatusSummaryResponse response = new WorkOrderStatusSummaryResponse();
+        response.setTotalCount(countSummaryOrders(query, null));
+        response.setPendingCount(countSummaryOrders(query, "pending"));
+        response.setProcessingCount(countSummaryOrders(query, "processing"));
+        response.setCompletedCount(countSummaryOrders(query, "completed"));
+        response.setClosedCount(countSummaryOrders(query, "closed"));
+        return response;
+    }
+
+    private long countSummaryOrders(WorkOrderQuery query, String status) {
+        List<Long> filteredOrderIds = findOrderIdsByEngineer(query.getEngineerId());
+        if (query.getEngineerId() != null && filteredOrderIds.isEmpty()) {
+            return 0L;
+        }
+        String keyword = query.getKeyword();
+        LambdaQueryWrapper<WorkOrder> wrapper = new LambdaQueryWrapper<WorkOrder>()
+                .and(StringUtils.hasText(keyword), item -> item
+                        .like(WorkOrder::getOrderNo, keyword)
+                        .or()
+                        .like(WorkOrder::getTitle, keyword)
+                        .or()
+                        .like(WorkOrder::getCustomerSiteName, keyword)
+                        .or()
+                        .like(WorkOrder::getDeviceName, keyword))
+                .eq(StringUtils.hasText(query.getType()), WorkOrder::getType, query.getType())
+                .eq(status != null, WorkOrder::getStatus, status)
+                .like(StringUtils.hasText(query.getCustomerKeyword()), WorkOrder::getCustomerSiteName, query.getCustomerKeyword())
+                .eq(query.getCustomerSiteId() != null, WorkOrder::getCustomerSiteId, query.getCustomerSiteId())
+                .in(!filteredOrderIds.isEmpty(), WorkOrder::getId, filteredOrderIds)
+                .ge(query.getCreatedStart() != null, WorkOrder::getCreatedAt, query.getCreatedStart())
+                .le(query.getCreatedEnd() != null, WorkOrder::getCreatedAt, query.getCreatedEnd())
+                .ge(query.getCompletedStart() != null, WorkOrder::getCompletedAt, query.getCompletedStart())
+                .le(query.getCompletedEnd() != null, WorkOrder::getCompletedAt, query.getCompletedEnd());
+        return workOrderMapper.selectCount(wrapper);
     }
 
     @Override

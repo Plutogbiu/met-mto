@@ -3,9 +3,12 @@ package com.met.mto.service.impl;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.met.mto.dto.DashboardCustomerRankResponse;
+import com.met.mto.dto.DashboardEngineerRankResponse;
 import com.met.mto.dto.DashboardOverviewResponse;
 import com.met.mto.dto.DashboardWorkOrderTrendResponse;
 import com.met.mto.entity.WorkOrder;
+import com.met.mto.entity.WorkOrderEngineer;
+import com.met.mto.mapper.WorkOrderEngineerMapper;
 import com.met.mto.mapper.WorkOrderMapper;
 import com.met.mto.service.DashboardService;
 import java.math.BigDecimal;
@@ -17,7 +20,10 @@ import java.time.temporal.ChronoUnit;
 import java.time.temporal.TemporalAdjusters;
 import java.time.temporal.WeekFields;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.HashMap;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
@@ -28,6 +34,8 @@ import org.springframework.stereotype.Service;
 public class DashboardServiceImpl implements DashboardService {
 
     private final WorkOrderMapper workOrderMapper;
+
+    private final WorkOrderEngineerMapper workOrderEngineerMapper;
 
     @Override
     public DashboardOverviewResponse getOverview(LocalDate startDate, LocalDate endDate, String type) {
@@ -44,6 +52,7 @@ public class DashboardServiceImpl implements DashboardService {
         response.setClosedCount(countByStatus(startTime, endTime, normalizedType, "closed"));
         response.setCompletionRate(calculateCompletionRate(response.getCompletedCount(), response.getTotalCount()));
         response.setCustomerRanks(loadCustomerRanks(startTime, endTime, normalizedType));
+        response.setEngineerRanks(loadEngineerRanks(startTime, endTime, normalizedType));
         response.setTrendUnit(resolveTrendUnit(startDate, endDate));
         response.setTrends(loadTrends(startDate, endDate, normalizedType, response.getTrendUnit()));
         return response;
@@ -110,6 +119,60 @@ public class DashboardServiceImpl implements DashboardService {
             cursor = nextTrendDate(cursor, trendUnit);
         }
         return trends;
+    }
+
+    private List<DashboardEngineerRankResponse> loadEngineerRanks(
+            LocalDateTime startTime, LocalDateTime endTime, String type) {
+        List<WorkOrder> orders = workOrderMapper.selectList(new LambdaQueryWrapper<WorkOrder>()
+                .select(WorkOrder::getId, WorkOrder::getStatus)
+                .ge(WorkOrder::getCreatedAt, startTime)
+                .lt(WorkOrder::getCreatedAt, endTime)
+                .eq(type != null, WorkOrder::getType, type));
+        if (orders.isEmpty()) {
+            return Collections.emptyList();
+        }
+
+        Map<Long, WorkOrder> orderMap = new HashMap<>();
+        for (WorkOrder order : orders) {
+            orderMap.put(order.getId(), order);
+        }
+        List<WorkOrderEngineer> assignments = workOrderEngineerMapper.selectList(
+                new LambdaQueryWrapper<WorkOrderEngineer>()
+                        .in(WorkOrderEngineer::getWorkOrderId, orderMap.keySet()));
+        Map<Long, DashboardEngineerRankResponse> rankMap = new LinkedHashMap<>();
+        for (WorkOrderEngineer assignment : assignments) {
+            WorkOrder order = orderMap.get(assignment.getWorkOrderId());
+            if (order == null || assignment.getUserId() == null) {
+                continue;
+            }
+            DashboardEngineerRankResponse rank = rankMap.get(assignment.getUserId());
+            if (rank == null) {
+                rank = new DashboardEngineerRankResponse();
+                rank.setUserId(assignment.getUserId());
+                rank.setEngineerName(displayEngineerName(assignment));
+                rankMap.put(assignment.getUserId(), rank);
+            }
+            rank.setWorkOrderCount(rank.getWorkOrderCount() + 1);
+            if ("completed".equals(order.getStatus())) {
+                rank.setCompletedCount(rank.getCompletedCount() + 1);
+            }
+        }
+        List<DashboardEngineerRankResponse> ranks = new ArrayList<>(rankMap.values());
+        ranks.sort(Comparator.comparingLong(DashboardEngineerRankResponse::getWorkOrderCount)
+                .reversed()
+                .thenComparing(Comparator.comparingLong(DashboardEngineerRankResponse::getCompletedCount).reversed())
+                .thenComparing(DashboardEngineerRankResponse::getEngineerName, Comparator.nullsLast(String::compareTo)));
+        return ranks.size() > 10 ? new ArrayList<>(ranks.subList(0, 10)) : ranks;
+    }
+
+    private String displayEngineerName(WorkOrderEngineer engineer) {
+        if (engineer.getRealName() != null && !engineer.getRealName().trim().isEmpty()) {
+            return engineer.getRealName();
+        }
+        if (engineer.getUsername() != null && !engineer.getUsername().trim().isEmpty()) {
+            return engineer.getUsername();
+        }
+        return String.valueOf(engineer.getUserId());
     }
 
     private Map<String, Long> loadTrendCounts(

@@ -10,6 +10,12 @@ spring:
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+  #正式环境database配置
+  # datasource:
+  #   url: jdbc:mysql://43.143.235.157:3306/mto?useUnicode=true&characterEncoding=UTF-8&serverTimezone=Asia/Shanghai&useSSL=false&allowPublicKeyRetrieval=true
+  #   username: met  
+  #   password: 886887
+  #   driver-class-name: com.mysql.cj.jdbc.Driver
   servlet:
     multipart:
       max-file-size: 20MB
@@ -46,6 +52,8 @@ mto:
     max-work-orders: 200
     queue-capacity: 2
     expire-hours: 24
+    # 原生下载地址的一次性凭证有效期，避免 JWT 出现在 URL 中
+    download-ticket-expire-minutes: 5
   map:
     tencent:
       # 腾讯地图 Key，用于客户选址、后续导航和打卡定位

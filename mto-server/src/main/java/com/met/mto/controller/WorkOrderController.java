@@ -4,11 +4,13 @@ import com.met.mto.common.ApiResult;
 import com.met.mto.common.PageResult;
 import com.met.mto.dto.WorkOrderContentRequest;
 import com.met.mto.dto.WorkOrderExportDownloadFile;
+import com.met.mto.dto.WorkOrderExportDownloadTicketResponse;
 import com.met.mto.dto.WorkOrderExportTaskRequest;
 import com.met.mto.dto.WorkOrderExportTaskResponse;
 import com.met.mto.dto.WorkOrderQuery;
 import com.met.mto.dto.WorkOrderRequest;
 import com.met.mto.dto.WorkOrderResponse;
+import com.met.mto.dto.WorkOrderStatusSummaryResponse;
 import com.met.mto.dto.WorkOrderReceiptFile;
 import com.met.mto.security.PermissionCode;
 import com.met.mto.security.RequirePermission;
@@ -82,6 +84,34 @@ public class WorkOrderController {
         return ApiResult.ok(workOrderService.page(query));
     }
 
+    @GetMapping("/status-summary")
+    @RequirePermission(PermissionCode.WORK_ORDER_LIST)
+    public ApiResult<WorkOrderStatusSummaryResponse> statusSummary(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String type,
+            @RequestParam(required = false) String customerKeyword,
+            @RequestParam(required = false) Long customerSiteId,
+            @RequestParam(required = false) Long engineerId,
+            @RequestParam(required = false) String createdStart,
+            @RequestParam(required = false) String createdEnd,
+            @RequestParam(required = false) String completedStart,
+            @RequestParam(required = false) String completedEnd,
+            @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        WorkOrderQuery query = new WorkOrderQuery();
+        query.setKeyword(keyword);
+        query.setType(type);
+        query.setCustomerKeyword(customerKeyword);
+        query.setCustomerSiteId(customerSiteId);
+        query.setEngineerId("field_engineer".equals(currentRole) ? currentUserId : engineerId);
+        query.setCreatedStart(parseStartTime(createdStart));
+        query.setCreatedEnd(parseEndTime(createdEnd));
+        query.setCompletedStart(parseStartTime(completedStart));
+        query.setCompletedEnd(parseEndTime(completedEnd));
+        return ApiResult.ok(workOrderService.statusSummary(query));
+    }
+
     @GetMapping("/{id}")
     @RequirePermission(PermissionCode.WORK_ORDER_DETAIL)
     public ApiResult<WorkOrderResponse> get(
@@ -131,14 +161,22 @@ public class WorkOrderController {
         return ApiResult.ok(workOrderExportTaskService.get(taskId, currentUserId, currentRole));
     }
 
-    @GetMapping("/export-tasks/{taskId}/download")
+    @PostMapping("/export-tasks/{taskId}/download-ticket")
     @RequirePermission(PermissionCode.WORK_ORDER_RECEIPT_BATCH_EXPORT)
-    public ResponseEntity<StreamingResponseBody> downloadExportTask(
+    public ApiResult<WorkOrderExportDownloadTicketResponse> createExportTaskDownloadTicket(
             @PathVariable Long taskId,
             @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
             @RequestAttribute(value = "currentRole", required = false) String currentRole
     ) {
-        WorkOrderExportDownloadFile file = workOrderExportTaskService.getDownloadFile(taskId, currentUserId, currentRole);
+        return ApiResult.ok(workOrderExportTaskService.createDownloadTicket(taskId, currentUserId, currentRole));
+    }
+
+    @GetMapping("/export-tasks/{taskId}/download")
+    public ResponseEntity<StreamingResponseBody> downloadExportTask(
+            @PathVariable Long taskId,
+            @RequestParam String ticket
+    ) {
+        WorkOrderExportDownloadFile file = workOrderExportTaskService.consumeDownloadTicket(taskId, ticket);
         StreamingResponseBody body = output -> java.nio.file.Files.copy(file.getPath(), output);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.parseMediaType("application/zip"));
@@ -146,6 +184,8 @@ public class WorkOrderController {
                 .filename(file.getFileName(), StandardCharsets.UTF_8)
                 .build());
         headers.setContentLength(file.getFileSize());
+        headers.setCacheControl("no-store");
+        headers.add("X-Content-Type-Options", "nosniff");
         return ResponseEntity.ok().headers(headers).body(body);
     }
 

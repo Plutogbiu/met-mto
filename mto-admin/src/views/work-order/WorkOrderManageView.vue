@@ -8,12 +8,13 @@ import { getDevicePage } from '../../api/device'
 import { getUserPage } from '../../api/user'
 import {
   createWorkOrder,
+  createWorkOrderExportDownloadTicket,
   createWorkOrderExportTask,
   deleteWorkOrder,
   downloadWorkOrderReceipt,
-  downloadWorkOrderExportTask,
   getWorkOrderExportTask,
   getWorkOrderPage,
+  getWorkOrderStatusSummary,
   updateWorkOrder,
   updateWorkOrderStatus,
   voidWorkOrder,
@@ -31,6 +32,7 @@ const customerOptions = ref([])
 const deviceOptions = ref([])
 const engineerOptions = ref([])
 const total = ref(0)
+const statusSummary = ref(createEmptyStatusSummary())
 const currentUser = ref(readCurrentUser())
 const workOrderTable = ref(null)
 const selectedWorkOrderIds = ref([])
@@ -74,6 +76,8 @@ const filters = reactive({
   status: '',
   customerSiteId: null,
   customerSiteName: '',
+  engineerId: null,
+  engineerName: '',
   createdRange: [],
   completedRange: [],
   page: 1,
@@ -92,6 +96,18 @@ const form = reactive({
   estimatedCompleteTime: '',
   engineerIds: [],
 })
+
+const summaryCards = computed(() => [
+  { label: '工单总数', value: statusSummary.value.totalCount, status: '', tone: 'blue' },
+  { label: '待处理', value: statusSummary.value.pendingCount, status: 'pending', tone: 'orange' },
+  { label: '处理中', value: statusSummary.value.processingCount, status: 'processing', tone: 'cyan' },
+  { label: '已完成', value: statusSummary.value.completedCount, status: 'completed', tone: 'green' },
+  { label: '已作废', value: statusSummary.value.closedCount, status: 'closed', tone: 'gray' },
+])
+
+function createEmptyStatusSummary() {
+  return { totalCount: 0, pendingCount: 0, processingCount: 0, completedCount: 0, closedCount: 0 }
+}
 
 const dialogTitle = computed(() => (editingId.value ? '编辑工单' : '新增工单'))
 const isOnsiteOrder = computed(() => form.type === 'onsite')
@@ -222,24 +238,38 @@ async function loadEngineers() {
 async function loadWorkOrders() {
   loading.value = true
   try {
-    const result = await getWorkOrderPage({
+    const params = {
       keyword: filters.keyword || undefined,
       type: filters.type || undefined,
       status: filters.status || undefined,
       customerSiteId: filters.customerSiteId || undefined,
+      engineerId: filters.engineerId || undefined,
       createdStart: filters.createdRange?.[0] || undefined,
       createdEnd: filters.createdRange?.[1] || undefined,
       completedStart: filters.completedRange?.[0] || undefined,
       completedEnd: filters.completedRange?.[1] || undefined,
       page: filters.page,
       size: filters.size,
-    })
+    }
+    const summaryParams = { ...params, status: undefined, page: undefined, size: undefined }
+    const [result, summaryResult] = await Promise.all([
+      getWorkOrderPage(params),
+      getWorkOrderStatusSummary(summaryParams),
+    ])
     workOrders.value = result.data?.records || []
     total.value = result.data?.total || 0
+    statusSummary.value = { ...createEmptyStatusSummary(), ...(summaryResult.data || {}) }
     await restoreTableSelection()
   } finally {
     loading.value = false
   }
+}
+
+function selectSummaryStatus(status) {
+  filters.status = status
+  filters.page = 1
+  clearExportSelection()
+  loadWorkOrders()
 }
 
 function search() {
@@ -252,6 +282,12 @@ function applyRouteFilters() {
   const customerSiteId = Number(route.query.customerSiteId)
   filters.customerSiteId = Number.isInteger(customerSiteId) && customerSiteId > 0 ? customerSiteId : null
   filters.customerSiteName = typeof route.query.customerSiteName === 'string' ? route.query.customerSiteName : ''
+  if (['pending', 'processing', 'completed', 'closed'].includes(route.query.status)) {
+    filters.status = route.query.status
+  }
+  const engineerId = Number(route.query.engineerId)
+  filters.engineerId = Number.isInteger(engineerId) && engineerId > 0 ? engineerId : null
+  filters.engineerName = typeof route.query.engineerName === 'string' ? route.query.engineerName : ''
   if (typeof route.query.createdStart === 'string' && typeof route.query.createdEnd === 'string') {
     filters.createdRange = [route.query.createdStart, route.query.createdEnd]
   }
@@ -266,6 +302,31 @@ function clearCustomerSiteFilter() {
   const { customerSiteId, customerSiteName, ...query } = route.query
   router.replace({ query })
   search()
+}
+
+function clearEngineerFilter() {
+  filters.engineerId = null
+  filters.engineerName = ''
+  const { engineerId, engineerName, ...query } = route.query
+  router.replace({ query })
+  search()
+}
+
+function currentListQuery() {
+  const query = {
+    keyword: filters.keyword || undefined,
+    type: filters.type || undefined,
+    status: filters.status || undefined,
+    customerSiteId: filters.customerSiteId ? String(filters.customerSiteId) : undefined,
+    customerSiteName: filters.customerSiteName || undefined,
+    engineerId: filters.engineerId ? String(filters.engineerId) : undefined,
+    engineerName: filters.engineerName || undefined,
+    createdStart: filters.createdRange?.[0] || undefined,
+    createdEnd: filters.createdRange?.[1] || undefined,
+    completedStart: filters.completedRange?.[0] || undefined,
+    completedEnd: filters.completedRange?.[1] || undefined,
+  }
+  return Object.fromEntries(Object.entries(query).filter(([, value]) => value !== undefined && value !== ''))
 }
 
 function isExportSelectable(row) {
@@ -451,26 +512,12 @@ async function downloadExportTask() {
   }
   exportTaskDownloading.value = true
   try {
-    const response = await downloadWorkOrderExportTask(exportTask.value.id)
-    const contentType = response.headers?.['content-type'] || ''
-    if (!contentType.includes('application/zip')) {
-      const message = await response.data.text().then((text) => {
-        try {
-          return JSON.parse(text)?.message || 'ZIP 文件下载失败'
-        } catch (error) {
-          return 'ZIP 文件下载失败'
-        }
-      })
-      throw new Error(message)
-    }
-    const url = URL.createObjectURL(response.data)
+    const result = await createWorkOrderExportDownloadTicket(exportTask.value.id)
     const link = document.createElement('a')
-    link.href = url
-    link.download = exportTask.value.fileName || '工单回执.zip'
+    link.href = result.data.downloadUrl
     document.body.appendChild(link)
     link.click()
     link.remove()
-    URL.revokeObjectURL(url)
     ElMessage.success('ZIP 文件已开始下载')
   } catch (error) {
     ElMessage.error(error?.message || 'ZIP 文件下载失败')
@@ -487,7 +534,10 @@ function hasMoreActions(row) {
 }
 
 function openDetail(row) {
-  router.push(`/work-orders/${row.id}`)
+  router.push({
+    path: `/work-orders/${row.id}`,
+    query: currentListQuery(),
+  })
 }
 
 async function openCreate() {
@@ -657,6 +707,20 @@ onUnmounted(() => {
     </div>
   </section>
 
+  <section class="work-order-summary-grid">
+    <button
+      v-for="item in summaryCards"
+      :key="item.label"
+      type="button"
+      class="work-order-summary-card"
+      :class="`tone-${item.tone}`"
+      @click="selectSummaryStatus(item.status)"
+    >
+      <span>{{ item.label }}</span>
+      <strong>{{ item.value }}</strong>
+    </button>
+  </section>
+
   <section class="toolbar">
     <el-input
       v-model="filters.keyword"
@@ -700,6 +764,9 @@ onUnmounted(() => {
     <el-button :icon="Refresh" @click="loadWorkOrders">刷新</el-button>
     <el-tag v-if="filters.customerSiteId" closable effect="plain" @close="clearCustomerSiteFilter">
       客户：{{ filters.customerSiteName || filters.customerSiteId }}
+    </el-tag>
+    <el-tag v-if="filters.engineerId" closable effect="plain" @close="clearEngineerFilter">
+      工程师：{{ filters.engineerName || filters.engineerId }}
     </el-tag>
   </section>
 
@@ -1012,6 +1079,47 @@ onUnmounted(() => {
   width: 140px;
 }
 
+.work-order-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+}
+
+.work-order-summary-card {
+  display: flex;
+  min-height: 78px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid #e4e7ec;
+  border-radius: 8px;
+  background: #fff;
+  color: #667085;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .2s, box-shadow .2s, transform .2s;
+}
+
+.work-order-summary-card:hover {
+  border-color: #b7d0f7;
+  box-shadow: 0 5px 16px rgba(47, 128, 237, .08);
+  transform: translateY(-1px);
+}
+
+.work-order-summary-card strong {
+  color: #172033;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.work-order-summary-card.tone-orange strong { color: #e88b2c; }
+.work-order-summary-card.tone-cyan strong { color: #159a9c; }
+.work-order-summary-card.tone-green strong { color: #30a46c; }
+.work-order-summary-card.tone-gray strong { color: #667085; }
+
 .header-actions,
 .date-filter,
 .export-task-header,
@@ -1115,5 +1223,13 @@ onUnmounted(() => {
 
 :deep(.danger-item) {
   color: #d92d20;
+}
+
+@media (max-width: 900px) {
+  .work-order-summary-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
+@media (max-width: 600px) {
+  .work-order-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 </style>

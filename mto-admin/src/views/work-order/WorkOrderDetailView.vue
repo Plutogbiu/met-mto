@@ -184,7 +184,7 @@ onMounted(() => {
 <template>
   <section class="detail-header">
     <div>
-      <el-button :icon="ArrowLeft" @click="router.push('/work-orders')">返回</el-button>
+      <el-button :icon="ArrowLeft" @click="router.push({ path: '/work-orders', query: { ...route.query } })">返回</el-button>
       <el-button :icon="Refresh" @click="loadDetail">刷新</el-button>
       <el-button
         v-if="workOrder?.status === 'completed' && hasPermission('work-order:receipt-export')"

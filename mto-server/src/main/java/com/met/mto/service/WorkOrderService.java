@@ -4,10 +4,13 @@ import com.met.mto.common.PageResult;
 import com.met.mto.dto.WorkOrderQuery;
 import com.met.mto.dto.WorkOrderRequest;
 import com.met.mto.dto.WorkOrderResponse;
+import com.met.mto.dto.WorkOrderStatusSummaryResponse;
 
 public interface WorkOrderService {
 
     PageResult<WorkOrderResponse> page(WorkOrderQuery query);
+
+    WorkOrderStatusSummaryResponse statusSummary(WorkOrderQuery query);
 
     WorkOrderResponse get(Long id);
 

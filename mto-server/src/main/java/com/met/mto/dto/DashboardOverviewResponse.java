@@ -26,6 +26,8 @@ public class DashboardOverviewResponse {
 
     private List<DashboardCustomerRankResponse> customerRanks;
 
+    private List<DashboardEngineerRankResponse> engineerRanks;
+
     private String trendUnit;
 
     private List<DashboardWorkOrderTrendResponse> trends;
