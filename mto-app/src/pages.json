@@ -53,6 +53,27 @@
         "navigationBarTitleText": "我的",
         "navigationStyle": "custom"
       }
+    },
+    {
+      "path": "pages/settings/settings",
+      "style": {
+        "navigationBarTitleText": "设置",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/settings/password",
+      "style": {
+        "navigationBarTitleText": "修改密码",
+        "navigationStyle": "custom"
+      }
+    },
+    {
+      "path": "pages/settings/developer",
+      "style": {
+        "navigationBarTitleText": "开发者设置",
+        "navigationStyle": "custom"
+      }
     }
   ],
   "easycom": {

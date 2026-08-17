@@ -19,6 +19,7 @@ public enum ErrorCode {
     USER_USERNAME_EXISTS(1303, "账号已存在"),
     USER_PASSWORD_REQUIRED(1304, "密码不能为空"),
     USER_ROLE_REQUIRED(1305, "角色不能为空"),
+    USER_OLD_PASSWORD_INCORRECT(1306, "旧密码不正确"),
     WORK_ORDER_NOT_FOUND(1401, "工单不存在"),
     WORK_ORDER_CUSTOMER_REQUIRED(1403, "请选择客户"),
     WORK_ORDER_ENGINEER_REQUIRED(1404, "请选择现场实施工程师"),
@@ -30,7 +31,8 @@ public enum ErrorCode {
     CUSTOMER_DEVICE_NAME_REQUIRED(1502, "设备名称不能为空"),
     ATTACHMENT_NOT_FOUND(1601, "附件不存在"),
     FILE_EMPTY(1602, "上传文件不能为空"),
-    FILE_UPLOAD_FAILED(1603, "文件上传失败");
+    FILE_UPLOAD_FAILED(1603, "文件上传失败"),
+    REPORT_GENERATION_FAILED(1701, "回执报告生成失败");
 
     
     private final int code;

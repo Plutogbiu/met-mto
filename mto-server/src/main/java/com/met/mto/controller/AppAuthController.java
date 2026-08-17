@@ -1,15 +1,18 @@
 package com.met.mto.controller;
 
 import com.met.mto.common.ApiResult;
+import com.met.mto.dto.ChangePasswordRequest;
 import com.met.mto.dto.LoginRequest;
 import com.met.mto.dto.LoginResponse;
 import com.met.mto.service.AuthService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.PutMapping;
 
 @RestController
 @RequestMapping("/api/app/auth")
@@ -28,6 +31,24 @@ public class AppAuthController {
 
     @PostMapping("/logout")
     public ApiResult<Void> logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        String token = authorization != null && authorization.startsWith("Bearer ")
+                ? authorization.substring("Bearer ".length())
+                : authorization;
+        authService.logout(token);
+        return ApiResult.ok();
+    }
+
+    @PutMapping("/password")
+    public ApiResult<Void> changePassword(
+            @RequestBody ChangePasswordRequest request,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
+            @RequestAttribute(value = "currentClientType", required = false) String currentClientType
+    ) {
+        if (!CLIENT_APP.equals(currentClientType)) {
+            return ApiResult.fail(com.met.mto.exception.ErrorCode.FORBIDDEN);
+        }
+        authService.changePassword(currentUserId, request);
         String token = authorization != null && authorization.startsWith("Bearer ")
                 ? authorization.substring("Bearer ".length())
                 : authorization;

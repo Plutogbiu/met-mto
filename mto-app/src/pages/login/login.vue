@@ -39,22 +39,40 @@
         />
       </view>
 
+      <view class="remember-row" @click="toggleRememberPassword">
+        <view class="remember-checkbox" :class="{ checked: rememberPassword }">
+          <u-icon v-if="rememberPassword" name="checkmark" color="#fff" size="13" />
+        </view>
+        <text>记住账号和密码</text>
+      </view>
+
       <view class="login-button" :class="{ loading }" @click="handleLogin">
         <u-loading-icon v-if="loading" color="#fff" size="18" />
         <text>{{ loading ? '登录中' : '登录' }}</text>
       </view>
+    </view>
+
+    <view class="developer-entry" @click="openDeveloperSettings">
+      <u-icon name="setting" color="#98A2B3" size="15" />
+      <text>开发者设置</text>
     </view>
   </view>
 </template>
 
 <script>
 import { login } from '../../api/auth'
-import { setAuth } from '../../utils/auth'
+import {
+  clearRememberedCredentials,
+  getRememberedCredentials,
+  saveRememberedCredentials,
+  setAuth,
+} from '../../utils/auth'
 
 export default {
   data() {
     return {
       loading: false,
+      rememberPassword: false,
       inputStyle: {
         padding: '0',
         minHeight: '76rpx',
@@ -64,6 +82,13 @@ export default {
         username: '',
         password: '',
       },
+    }
+  },
+  onLoad() {
+    const credentials = getRememberedCredentials()
+    if (credentials) {
+      this.form = credentials
+      this.rememberPassword = true
     }
   },
   methods: {
@@ -76,6 +101,11 @@ export default {
       this.loading = true
       try {
         const data = await login(this.form)
+        if (this.rememberPassword) {
+          saveRememberedCredentials(this.form)
+        } else {
+          clearRememberedCredentials()
+        }
         setAuth(data)
         uni.showToast({ title: '登录成功', icon: 'success' })
         setTimeout(() => {
@@ -84,6 +114,15 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    toggleRememberPassword() {
+      this.rememberPassword = !this.rememberPassword
+      if (!this.rememberPassword) {
+        clearRememberedCredentials()
+      }
+    },
+    openDeveloperSettings() {
+      uni.navigateTo({ url: '/pages/settings/developer' })
     },
   },
 }
@@ -174,6 +213,31 @@ export default {
   font-size: 23rpx;
 }
 
+.remember-row {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin: 4rpx 2rpx 0;
+  color: #64748b;
+  font-size: 24rpx;
+}
+
+.remember-checkbox {
+  display: grid;
+  width: 30rpx;
+  height: 30rpx;
+  box-sizing: border-box;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8rpx;
+  background: #fff;
+}
+
+.remember-checkbox.checked {
+  border-color: #165dff;
+  background: #165dff;
+}
+
 .login-button {
   display: flex;
   height: 88rpx;
@@ -191,5 +255,18 @@ export default {
 
 .login-button.loading {
   opacity: 0.82;
+}
+
+.developer-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6rpx;
+  position: fixed;
+  right: 28rpx;
+  bottom: calc(28rpx + env(safe-area-inset-bottom));
+  color: #98a2b3;
+  font-size: 21rpx;
+  opacity: 0.72;
 }
 </style>

@@ -36,6 +36,28 @@ export function getWorkOrderRecords(id) {
   return http.get(`/admin/work-orders/${id}/records`)
 }
 
+export function downloadWorkOrderReceipt(id) {
+  return http.get(`/admin/work-orders/${id}/receipt-pdf`, {
+    responseType: 'blob',
+    timeout: 0,
+  })
+}
+
+export function createWorkOrderExportTask(data) {
+  return http.post('/admin/work-orders/export-tasks', data)
+}
+
+export function getWorkOrderExportTask(id) {
+  return http.get(`/admin/work-orders/export-tasks/${id}`)
+}
+
+export function downloadWorkOrderExportTask(id) {
+  return http.get(`/admin/work-orders/export-tasks/${id}/download`, {
+    responseType: 'blob',
+    timeout: 0,
+  })
+}
+
 export function createWorkOrderRecord(id, data) {
   return http.post(`/admin/work-orders/${id}/records`, data)
 }

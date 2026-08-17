@@ -33,8 +33,6 @@ public class WorkOrderResponse {
 
     private String content;
 
-    private String notice;
-
     private LocalDateTime estimatedArrivalTime;
 
     private LocalDateTime estimatedCompleteTime;

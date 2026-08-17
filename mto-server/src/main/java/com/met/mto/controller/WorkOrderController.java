@@ -2,15 +2,27 @@ package com.met.mto.controller;
 
 import com.met.mto.common.ApiResult;
 import com.met.mto.common.PageResult;
+import com.met.mto.dto.WorkOrderContentRequest;
+import com.met.mto.dto.WorkOrderExportDownloadFile;
+import com.met.mto.dto.WorkOrderExportTaskRequest;
+import com.met.mto.dto.WorkOrderExportTaskResponse;
 import com.met.mto.dto.WorkOrderQuery;
 import com.met.mto.dto.WorkOrderRequest;
 import com.met.mto.dto.WorkOrderResponse;
+import com.met.mto.dto.WorkOrderReceiptFile;
 import com.met.mto.security.PermissionCode;
 import com.met.mto.security.RequirePermission;
 import com.met.mto.service.WorkOrderService;
+import com.met.mto.service.WorkOrderExportTaskService;
+import com.met.mto.service.WorkOrderReceiptPdfService;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -21,6 +33,7 @@ import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 @RestController
 @RequestMapping("/api/admin/work-orders")
@@ -28,6 +41,10 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+
+    private final WorkOrderReceiptPdfService workOrderReceiptPdfService;
+
+    private final WorkOrderExportTaskService workOrderExportTaskService;
 
     @GetMapping
     @RequirePermission(PermissionCode.WORK_ORDER_LIST)
@@ -41,6 +58,8 @@ public class WorkOrderController {
             @RequestParam(required = false) Long engineerId,
             @RequestParam(required = false) String createdStart,
             @RequestParam(required = false) String createdEnd,
+            @RequestParam(required = false) String completedStart,
+            @RequestParam(required = false) String completedEnd,
             @RequestParam(defaultValue = "1") long page,
             @RequestParam(defaultValue = "10") long size,
             @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
@@ -56,6 +75,8 @@ public class WorkOrderController {
         query.setEngineerId("field_engineer".equals(currentRole) ? currentUserId : engineerId);
         query.setCreatedStart(parseStartTime(createdStart));
         query.setCreatedEnd(parseEndTime(createdEnd));
+        query.setCompletedStart(parseStartTime(completedStart));
+        query.setCompletedEnd(parseEndTime(completedEnd));
         query.setPage(page);
         query.setSize(size);
         return ApiResult.ok(workOrderService.page(query));
@@ -70,6 +91,62 @@ public class WorkOrderController {
     ) {
         workOrderService.checkAccess(id, currentUserId, currentRole);
         return ApiResult.ok(workOrderService.get(id));
+    }
+
+    @GetMapping("/{id}/receipt-pdf")
+    @RequirePermission(PermissionCode.WORK_ORDER_RECEIPT_EXPORT)
+    public ResponseEntity<byte[]> exportReceiptPdf(
+            @PathVariable Long id,
+            @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        workOrderService.checkAccess(id, currentUserId, currentRole);
+        WorkOrderReceiptFile file = workOrderReceiptPdfService.export(id);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(file.getFileName(), StandardCharsets.UTF_8)
+                .build());
+        headers.setContentLength(file.getContent().length);
+        return ResponseEntity.ok().headers(headers).body(file.getContent());
+    }
+
+    @PostMapping("/export-tasks")
+    @RequirePermission(PermissionCode.WORK_ORDER_RECEIPT_BATCH_EXPORT)
+    public ApiResult<WorkOrderExportTaskResponse> createExportTask(
+            @RequestBody WorkOrderExportTaskRequest request,
+            @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
+            @RequestAttribute(value = "currentRealName", required = false) String currentRealName
+    ) {
+        return ApiResult.ok(workOrderExportTaskService.create(request, currentUserId, currentRealName));
+    }
+
+    @GetMapping("/export-tasks/{taskId}")
+    @RequirePermission(PermissionCode.WORK_ORDER_RECEIPT_BATCH_EXPORT)
+    public ApiResult<WorkOrderExportTaskResponse> getExportTask(
+            @PathVariable Long taskId,
+            @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        return ApiResult.ok(workOrderExportTaskService.get(taskId, currentUserId, currentRole));
+    }
+
+    @GetMapping("/export-tasks/{taskId}/download")
+    @RequirePermission(PermissionCode.WORK_ORDER_RECEIPT_BATCH_EXPORT)
+    public ResponseEntity<StreamingResponseBody> downloadExportTask(
+            @PathVariable Long taskId,
+            @RequestAttribute(value = "currentUserId", required = false) Long currentUserId,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        WorkOrderExportDownloadFile file = workOrderExportTaskService.getDownloadFile(taskId, currentUserId, currentRole);
+        StreamingResponseBody body = output -> java.nio.file.Files.copy(file.getPath(), output);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("application/zip"));
+        headers.setContentDisposition(ContentDisposition.attachment()
+                .filename(file.getFileName(), StandardCharsets.UTF_8)
+                .build());
+        headers.setContentLength(file.getFileSize());
+        return ResponseEntity.ok().headers(headers).body(body);
     }
 
     private LocalDateTime parseStartTime(String value) {
@@ -113,6 +190,20 @@ public class WorkOrderController {
     ) {
         workOrderService.checkAccess(id, operatorId, currentRole);
         return ApiResult.ok(workOrderService.update(id, request, operatorId, operatorName));
+    }
+
+    @PutMapping("/{id}/content")
+    @RequirePermission(PermissionCode.WORK_ORDER_PROCESS)
+    public ApiResult<Void> updateContent(
+            @PathVariable Long id,
+            @RequestBody WorkOrderContentRequest request,
+            @RequestAttribute(value = "currentUserId", required = false) Long operatorId,
+            @RequestAttribute(value = "currentRealName", required = false) String operatorName,
+            @RequestAttribute(value = "currentRole", required = false) String currentRole
+    ) {
+        workOrderService.checkAccess(id, operatorId, currentRole);
+        workOrderService.updateContent(id, request == null ? null : request.getContent(), operatorId, operatorName);
+        return ApiResult.ok();
     }
 
     @PutMapping("/{id}/status")

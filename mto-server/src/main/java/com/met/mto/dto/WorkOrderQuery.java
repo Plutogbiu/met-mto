@@ -24,6 +24,10 @@ public class WorkOrderQuery {
 
     private LocalDateTime createdEnd;
 
+    private LocalDateTime completedStart;
+
+    private LocalDateTime completedEnd;
+
     private long page = 1;
 
     private long size = 10;

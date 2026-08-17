@@ -1,6 +1,7 @@
 package com.met.mto.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.met.mto.dto.ChangePasswordRequest;
 import com.met.mto.dto.LoginRequest;
 import com.met.mto.dto.LoginResponse;
 import com.met.mto.entity.SysUser;
@@ -34,8 +35,11 @@ public class AuthServiceImpl implements AuthService {
     private final StringRedisTemplate redisTemplate;
     private final PermissionService permissionService;
 
-    @Value("${mto.auth.token-expire-minutes}")
-    private long tokenExpireMinutes;
+    @Value("${mto.auth.admin-token-expire-minutes}")
+    private long adminTokenExpireMinutes;
+
+    @Value("${mto.auth.app-token-expire-days}")
+    private long appTokenExpireDays;
 
     @Override
     public LoginResponse login(LoginRequest request) {
@@ -59,7 +63,7 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(ErrorCode.FORBIDDEN, "现场实施人员只能登录 App");
         }
 
-        Duration expires = Duration.ofMinutes(tokenExpireMinutes);
+        Duration expires = resolveTokenExpires(clientType);
         String token = jwtTokenUtil.createToken(user.getId(), user.getUsername(), user.getRealName(), user.getRole(), clientType, expires);
         redisTemplate.opsForValue().set(tokenKey(token), String.valueOf(user.getId()), expires.getSeconds(), TimeUnit.SECONDS);
 
@@ -75,6 +79,33 @@ public class AuthServiceImpl implements AuthService {
     }
 
     @Override
+    public void changePassword(Long userId, ChangePasswordRequest request) {
+        if (userId == null) {
+            throw new BusinessException(ErrorCode.UNAUTHORIZED);
+        }
+        if (request == null
+                || !StringUtils.hasText(request.getOldPassword())
+                || !StringUtils.hasText(request.getNewPassword())) {
+            throw new BusinessException(ErrorCode.USER_PASSWORD_REQUIRED);
+        }
+        if (request.getOldPassword().equals(request.getNewPassword())) {
+            throw new BusinessException(ErrorCode.BAD_REQUEST, "新密码不能与旧密码相同");
+        }
+
+        SysUser user = sysUserMapper.selectById(userId);
+        if (user == null || user.getStatus() == null || user.getStatus() != 1) {
+            throw new BusinessException(ErrorCode.USER_NOT_FOUND);
+        }
+        if (!PasswordUtil.sha256(request.getOldPassword()).equalsIgnoreCase(user.getPasswordHash())) {
+            throw new BusinessException(ErrorCode.USER_OLD_PASSWORD_INCORRECT);
+        }
+
+        user.setPasswordHash(PasswordUtil.sha256(request.getNewPassword()));
+        user.setUpdatedAt(java.time.LocalDateTime.now());
+        sysUserMapper.updateById(user);
+    }
+
+    @Override
     public void logout(String token) {
         if (StringUtils.hasText(token)) {
             redisTemplate.delete(tokenKey(token));
@@ -83,6 +114,13 @@ public class AuthServiceImpl implements AuthService {
 
     private String tokenKey(String token) {
         return TOKEN_PREFIX + token;
+    }
+
+    private Duration resolveTokenExpires(String clientType) {
+        if (CLIENT_APP.equals(clientType)) {
+            return Duration.ofDays(appTokenExpireDays);
+        }
+        return Duration.ofMinutes(adminTokenExpireMinutes);
     }
 
     private String resolveClientType(String clientType) {

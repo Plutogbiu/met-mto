@@ -1,10 +1,10 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
-import { ArrowLeft, Picture, Refresh } from '@element-plus/icons-vue'
+import { ArrowLeft, Download, Picture, Refresh } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import { getAttachments } from '../../api/attachment'
-import { getWorkOrder, getWorkOrderRecords } from '../../api/workOrder'
-import { el } from 'element-plus/es/locale/index.mjs'
+import { downloadWorkOrderReceipt, getWorkOrder, getWorkOrderRecords } from '../../api/workOrder'
 
 const route = useRoute()
 const router = useRouter()
@@ -12,6 +12,8 @@ const loading = ref(false)
 const workOrder = ref(null)
 const records = ref([])
 const attachments = ref([])
+const exporting = ref(false)
+const currentUser = ref(null)
 
 const typeOptions = [
   { label: '现场工单', value: 'onsite', tag: 'primary' },
@@ -89,6 +91,60 @@ function hasRecordLocation(record) {
   return Boolean(record?.longitude && record?.latitude)
 }
 
+function hasPermission(permission) {
+  return Boolean(currentUser.value?.permissions?.includes(permission))
+}
+
+function fallbackFileName() {
+  const typeName = workOrder.value?.type === 'inspection' ? '日常巡检' : '现场工单'
+  const createdAt = String(workOrder.value?.createdAt || '').replace(/[^0-9]/g, '').slice(0, 14) || '未知时间'
+  return `物链易通-${workOrder.value?.customerSiteName || '-'}-${typeName}-${createdAt}_${workOrder.value?.orderNo || '-'}.pdf`
+}
+
+function responseFileName(response) {
+  const disposition = response.headers?.['content-disposition'] || ''
+  const encoded = disposition.match(/filename\*=UTF-8''([^;]+)/i)
+  if (encoded?.[1]) {
+    return decodeURIComponent(encoded[1])
+  }
+  const plain = disposition.match(/filename="?([^";]+)"?/i)
+  return plain?.[1] || fallbackFileName()
+}
+
+async function exportReceipt() {
+  if (!workOrder.value?.id || exporting.value) {
+    return
+  }
+  exporting.value = true
+  try {
+    const response = await downloadWorkOrderReceipt(workOrder.value.id)
+    const contentType = response.headers?.['content-type'] || ''
+    if (!contentType.includes('application/pdf')) {
+      const message = await response.data.text().then((text) => {
+        try {
+          return JSON.parse(text)?.message || '回执 PDF 导出失败'
+        } catch (error) {
+          return '回执 PDF 导出失败'
+        }
+      })
+      throw new Error(message)
+    }
+    const url = URL.createObjectURL(response.data)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = responseFileName(response)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+    ElMessage.success('回执 PDF 已开始下载')
+  } catch (error) {
+    ElMessage.error(error?.message || '回执 PDF 导出失败')
+  } finally {
+    exporting.value = false
+  }
+}
+
 function tencentMapUrl(record) {
   if (!hasRecordLocation(record)) {
     return ''
@@ -116,6 +172,11 @@ async function loadDetail() {
 }
 
 onMounted(() => {
+  try {
+    currentUser.value = JSON.parse(localStorage.getItem('mto-admin-user') || 'null')
+  } catch (error) {
+    currentUser.value = null
+  }
   loadDetail()
 })
 </script>
@@ -125,6 +186,15 @@ onMounted(() => {
     <div>
       <el-button :icon="ArrowLeft" @click="router.push('/work-orders')">返回</el-button>
       <el-button :icon="Refresh" @click="loadDetail">刷新</el-button>
+      <el-button
+        v-if="workOrder?.status === 'completed' && hasPermission('work-order:receipt-export')"
+        :icon="Download"
+        :loading="exporting"
+        type="primary"
+        @click="exportReceipt"
+      >
+        导出回执 PDF
+      </el-button>
     </div>
   </section>
 
@@ -164,7 +234,6 @@ onMounted(() => {
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="工单内容" :span="2">{{ workOrder.content || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="注意事项" :span="2">{{ workOrder.notice || '-' }}</el-descriptions-item>
         </el-descriptions>
       </section>
 

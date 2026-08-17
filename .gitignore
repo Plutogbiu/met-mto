@@ -47,6 +47,11 @@ target/
 !.mvn/wrapper/maven-wrapper.jar
 
 
+# mto-server
+fonts/
+exports/
+
+
 # Maven / Gradle
 .m2/
 maven-repo/

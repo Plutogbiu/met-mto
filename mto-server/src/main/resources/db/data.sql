@@ -6,6 +6,7 @@ select 'admin', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a91
 where not exists (select 1 from sys_user where username = 'admin');
 
 insert ignore into sys_permission (code, name, module, status, sort_order, created_at, updated_at) values
+('dashboard:view', '查看数据看板', '数据看板', 1, 5, now(), now()),
 ('user:list', '人员列表', '人员管理', 1, 10, now(), now()),
 ('user:detail', '人员详情', '人员管理', 1, 20, now(), now()),
 ('user:create', '新增人员', '人员管理', 1, 30, now(), now()),
@@ -31,12 +32,15 @@ insert ignore into sys_permission (code, name, module, status, sort_order, creat
 ('work-order:complete', '完成工单', '工单管理', 1, 360, now(), now()),
 ('work-order:process', '处理记录', '工单管理', 1, 370, now(), now()),
 ('work-order:delete', '删除工单', '工单管理', 1, 380, now(), now()),
+('work-order:receipt-export', '导出回执 PDF', '工单管理', 1, 390, now(), now()),
+('work-order:receipt-batch-export', '批量导出回执', '工单管理', 1, 400, now(), now()),
 ('attachment:list', '附件列表', '附件管理', 1, 410, now(), now()),
 ('attachment:detail', '附件详情', '附件管理', 1, 420, now(), now()),
 ('attachment:upload', '上传附件', '附件管理', 1, 430, now(), now()),
 ('attachment:delete', '删除附件', '附件管理', 1, 440, now(), now());
 
 insert ignore into sys_role_permission (role, permission_code, created_at) values
+('admin', 'dashboard:view', now()),
 ('admin', 'user:list', now()),
 ('admin', 'user:detail', now()),
 ('admin', 'user:create', now()),
@@ -62,11 +66,14 @@ insert ignore into sys_role_permission (role, permission_code, created_at) value
 ('admin', 'work-order:complete', now()),
 ('admin', 'work-order:process', now()),
 ('admin', 'work-order:delete', now()),
+('admin', 'work-order:receipt-export', now()),
+('admin', 'work-order:receipt-batch-export', now()),
 ('admin', 'attachment:list', now()),
 ('admin', 'attachment:detail', now()),
 ('admin', 'attachment:upload', now()),
 ('admin', 'attachment:delete', now()),
 ('online_ops', 'user:list', now()),
+('online_ops', 'dashboard:view', now()),
 ('online_ops', 'user:detail', now()),
 ('online_ops', 'customer:list', now()),
 ('online_ops', 'customer:detail', now()),
@@ -85,6 +92,8 @@ insert ignore into sys_role_permission (role, permission_code, created_at) value
 ('online_ops', 'work-order:status', now()),
 ('online_ops', 'work-order:complete', now()),
 ('online_ops', 'work-order:process', now()),
+('online_ops', 'work-order:receipt-export', now()),
+('online_ops', 'work-order:receipt-batch-export', now()),
 ('online_ops', 'attachment:list', now()),
 ('online_ops', 'attachment:detail', now()),
 ('online_ops', 'attachment:upload', now()),

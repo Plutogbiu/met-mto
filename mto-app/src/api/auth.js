@@ -14,3 +14,11 @@ export function logout() {
     method: 'POST',
   })
 }
+
+export function changePassword(data) {
+  return request({
+    url: '/app/auth/password',
+    method: 'PUT',
+    data,
+  })
+}
